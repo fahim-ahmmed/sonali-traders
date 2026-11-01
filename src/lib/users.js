@@ -12,3 +12,8 @@ export async function findUserById(id) {
   if (!ObjectId.isValid(id)) return null;
   return users().findOne({ _id: new ObjectId(String(id)) });
 }
+
+export async function findStaffUser(staff) {
+  const user = await findUserById(staff.userId);
+  return user && user.email?.toLowerCase() === staff.email?.toLowerCase() ? user : null;
+}

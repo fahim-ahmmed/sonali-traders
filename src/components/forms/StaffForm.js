@@ -24,6 +24,7 @@ export default function StaffForm({ staffId }) {
   const [show, setShow] = useState(false);
   const [errors, setErrors] = useState({});
   const [loaded, setLoaded] = useState(false);
+  const [hasLoginAccount, setHasLoginAccount] = useState(false);
   const [saving, setSaving] = useState(false);
   const [newPw, setNewPw] = useState("");
   const [resetting, setResetting] = useState(false);
@@ -34,7 +35,7 @@ export default function StaffForm({ staffId }) {
         if (!j.ok) { toast(j.error, "error"); return router.replace("/staff"); }
         const s = j.data.staff;
         setF({ name: s.name, designation: s.designation, phone: s.phone, salary: s.salary ? String(toTaka(s.salary)) : "", address: s.address, email: s.email, password: "" });
-        setPerms(s.permissions); setLoaded(true);
+        setPerms(s.permissions); setHasLoginAccount(s.hasLoginAccount); setLoaded(true);
       });
     } else {
       fetch("/api/settings/roles").then((r) => r.json()).then((j) => { if (j.ok) setPerms(j.data.staffDefault); setLoaded(true); });
@@ -86,7 +87,7 @@ export default function StaffForm({ staffId }) {
         </div>
         <Textarea label="Address" value={f.address} onChange={set("address")} />
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Email ID (login)" type="email" autoComplete="off" value={f.email} onChange={set("email")} error={errors.email} disabled={!!staffId} />
+          <Input label={staffId && !hasLoginAccount ? "Email address" : "Email ID (login)"} type="email" autoComplete="off" value={f.email} onChange={set("email")} error={errors.email} disabled={!!staffId} />
           {!staffId && (
             <div className="relative">
               <Input label="Password" type={show ? "text" : "password"} autoComplete="new-password" value={f.password} onChange={set("password")} error={errors.password}
@@ -95,14 +96,14 @@ export default function StaffForm({ staffId }) {
             </div>
           )}
         </div>
-        <PermissionPicker value={perms} onChange={setPerms} />
+        {(!staffId || hasLoginAccount) && <PermissionPicker value={perms} onChange={setPerms} />}
         <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
           <Link href="/staff" className="inline-flex min-h-[40px] items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">Cancel</Link>
           <Button type="submit" loading={saving}>{staffId ? "Update staff" : "Create staff account"}</Button>
         </div>
       </form>
 
-      {staffId && (
+      {staffId && hasLoginAccount && (
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/40 p-4">
           <h3 className="text-sm font-semibold text-navy-900">Reset password</h3>
           <p className="mb-3 text-xs text-slate-500">The staff member will need the new password to sign in again.</p>

@@ -8,6 +8,7 @@ const StaffSchema = new mongoose.Schema(
     designation: { type: String, default: "" },
     phone: { type: String, default: "" },
     salary: { type: Number, default: 0 }, // পয়সা
+    sortOrder: { type: Number, default: 9999 },
     address: { type: String, default: "" },
     active: { type: Boolean, default: true },
   },

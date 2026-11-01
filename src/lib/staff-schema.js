@@ -21,6 +21,6 @@ export const resetSchema = z.object({ password: z.string().min(8, "Password must
 
 export const staffDto = (s, user) => ({
   id: String(s._id), userId: s.userId, name: s.name, designation: s.designation, phone: s.phone,
-  salary: s.salary, address: s.address, email: s.email,
+  salary: s.salary, sortOrder: s.sortOrder ?? 9999, address: s.address, email: s.email, hasLoginAccount: Boolean(user),
   permissions: (() => { try { return JSON.parse(user?.permissions || "[]"); } catch { return []; } })(),
 });

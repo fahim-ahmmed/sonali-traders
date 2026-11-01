@@ -2,7 +2,7 @@ import { connectDB } from "@/lib/db";
 import { nativeDb } from "@/lib/db";
 import { ok, fail, requireUser } from "@/lib/api";
 import { authAdmin } from "@/lib/auth-admin";
-import { users } from "@/lib/users";
+import { findStaffUser, users } from "@/lib/users";
 import { staffCreateSchema, staffDto } from "@/lib/staff-schema";
 import Staff from "@/models/Staff";
 
@@ -10,10 +10,9 @@ export async function GET() {
   const { error } = await requireUser("admin");
   if (error) return error;
   await connectDB();
-  const list = await Staff.find({ active: true }).sort({ createdAt: 1 }).lean();
-  const urows = await users().find({ email: { $in: list.map((s) => s.email) } }).toArray();
-  const umap = new Map(urows.map((u) => [u.email, u]));
-  return ok(list.map((s) => staffDto(s, umap.get(s.email))));
+  const list = await Staff.find({ active: true }).sort({ sortOrder: 1, createdAt: 1 }).lean();
+  const linkedUsers = await Promise.all(list.map(findStaffUser));
+  return ok(list.map((staff, index) => staffDto(staff, linkedUsers[index])));
 }
 
 export async function POST(req) {

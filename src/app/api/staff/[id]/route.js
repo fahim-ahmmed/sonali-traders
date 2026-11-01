@@ -1,7 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { ok, fail, requireUser } from "@/lib/api";
 import { isValidId } from "@/lib/ids";
-import { idMatch, users, sessions } from "@/lib/users";
+import { findStaffUser, idMatch, users, sessions } from "@/lib/users";
 import { staffUpdateSchema, staffDto } from "@/lib/staff-schema";
 import Staff from "@/models/Staff";
 import Sale from "@/models/Sale";
@@ -15,7 +15,7 @@ export async function GET(_req, { params }) {
   await connectDB();
   const s = await Staff.findById(id).lean();
   if (!s || !s.active) return fail("Staff not found", 404);
-  const u = await users().findOne({ email: s.email });
+  const u = await findStaffUser(s);
   const [sales, expenses] = await Promise.all([
     Sale.find({ submittedBy: s.userId }).sort({ createdAt: -1 }).limit(30).populate("customerId", "name").lean(),
     Expense.find({ paidById: s.userId }).sort({ date: -1 }).limit(30).lean(),
@@ -38,8 +38,11 @@ export async function PUT(req, { params }) {
   await connectDB();
   const s = await Staff.findByIdAndUpdate(id, { name: d.name, designation: d.designation, phone: d.phone, salary: d.salary, address: d.address }, { new: true });
   if (!s) return fail("Staff not found", 404);
-  await users().updateOne({ email: s.email }, { $set: { name: d.name, permissions: JSON.stringify(d.permissions) } });
-  return ok(staffDto(s, { permissions: JSON.stringify(d.permissions) }));
+  const linkedUser = await findStaffUser(s);
+  if (linkedUser) {
+    await users().updateOne({ _id: linkedUser._id }, { $set: { name: d.name, permissions: JSON.stringify(d.permissions) } });
+  }
+  return ok(staffDto(s, linkedUser ? { ...linkedUser, permissions: JSON.stringify(d.permissions) } : null));
 }
 
 // ডিলিট = অ্যাকাউন্ট নিষ্ক্রিয় (জমা দেওয়া sale/expense অক্ষত থাকে)
@@ -53,7 +56,10 @@ export async function DELETE(_req, { params }) {
   if (!s) return fail("Staff not found", 404);
   if (s.userId === user.id) return fail("You can't remove your own account", 409);
   s.active = false; await s.save();
-  await users().updateOne({ email: s.email }, { $set: { active: false } });
-  await sessions().deleteMany({ userId: idMatch(s.userId) }); // এখনই লগআউট
+  const linkedUser = await findStaffUser(s);
+  if (linkedUser) {
+    await users().updateOne({ _id: linkedUser._id }, { $set: { active: false } });
+    await sessions().deleteMany({ userId: idMatch(s.userId) }); // এখনই লগআউট
+  }
   return ok({ deactivated: true });
 }
