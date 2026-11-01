@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Printer } from "lucide-react";
+import { ArrowLeft, BadgeCheck, HandCoins, MapPin, Pencil, Phone, Printer, ReceiptText, ShoppingCart, UserRound, Wallet } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -44,16 +44,22 @@ export default function CustomerLedgerPage() {
 
   const c = d?.customer;
   const s = d?.summary;
+  const cards = s ? [
+    { l: "Customer Name", v: c.name, icon: UserRound, tone: "text-navy-900", ring: "bg-brand-50 text-brand-600", text: true },
+    { l: "Total Purchases", v: formatMoney(s.totalPurchases), icon: ShoppingCart, tone: "text-navy-900", ring: "bg-slate-100 text-slate-600" },
+    { l: "Total Payments", v: formatMoney(s.totalPayments), icon: Wallet, tone: "text-navy-900", ring: "bg-slate-100 text-slate-600" },
+    { l: "Current Due", v: formatMoney(s.due), icon: ReceiptText, tone: s.due > 0 ? "text-rose-600" : "text-slate-400", ring: "bg-rose-50 text-rose-600", accent: s.due > 0 ? "bg-danger" : "" },
+    { l: "Available Advance", v: formatMoney(s.advance), icon: BadgeCheck, tone: s.advance > 0 ? "text-emerald-600" : "text-slate-400", ring: "bg-emerald-50 text-emerald-600", accent: s.advance > 0 ? "bg-success" : "" },
+  ] : [];
+
   return (
     <>
       <PageHeader group="Customer / Ledger" title="Customer management" />
-      <main className="p-5 sm:p-8">
-        <div className="no-print mb-3 flex items-center justify-between">
-          <Link href="/customers" className="text-xs font-semibold text-brand-600 hover:underline">← Customer List</Link>
-          <div className="flex gap-2">
-            <Link href={`/customers/${id}/edit`} className="inline-flex min-h-[40px] items-center rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-200">Edit</Link>
-            <Button onClick={() => window.print()} disabled={!d}><Printer className="h-4 w-4" /> Print Ledger</Button>
-          </div>
+      <main className="page">
+        <div className="no-print flex items-center justify-between gap-3">
+          <Link href="/customers" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition-colors hover:text-brand-600">
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Customer List
+          </Link>
         </div>
 
         {/* শুধু প্রিন্টে দেখা যায় */}
@@ -68,46 +74,96 @@ export default function CustomerLedgerPage() {
           <p className="mt-2 text-sm font-semibold">Customer Ledger — printed {formatDate(new Date())}</p>
         </div>
 
-        {!d ? <div className="space-y-3"><Skeleton className="h-10 w-72" /><Skeleton className="h-24" /><Skeleton className="h-48" /></div> : (
+        {!d ? (
+          <div className="space-y-4">
+            <Skeleton className="h-24 rounded-2xl" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
+            <Skeleton className="h-64 rounded-2xl" />
+          </div>
+        ) : (
           <>
-            <h2 className="text-xl font-bold text-navy-900">{c.name}</h2>
-            <p className="mb-4 text-sm text-slate-500">{[c.phone, c.address].filter(Boolean).join(" · ") || "No contact details"}</p>
+            {/* কাস্টমার হেডার */}
+            <section className="card flex flex-wrap items-center justify-between gap-4 p-5">
+              <div className="flex min-w-0 items-center gap-4">
+                <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-navy-800 to-navy-900 text-lg font-bold text-white shadow-lg shadow-navy-900/20">
+                  {(c.name || "?").slice(0, 2).toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="truncate text-xl font-bold tracking-tight text-navy-900">{c.name}</h2>
+                    {s.due === 0 && s.advance === 0 && <Badge tone="success">All settled</Badge>}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+                    <span className="num inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" aria-hidden />{c.phone || "No phone"}</span>
+                    <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" aria-hidden />{c.address || "No address"}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="no-print flex gap-2">
+                <Link href={`/customers/${id}/edit`} className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">
+                  <Pencil className="h-4 w-4" aria-hidden /> Edit
+                </Link>
+                <Button onClick={() => window.print()} disabled={!d}><Printer className="h-4 w-4" aria-hidden /> Print Ledger</Button>
+              </div>
+            </section>
 
-            <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {[["Total purchases", s.totalPurchases, "text-navy-900"], ["Total payments", s.totalPayments, "text-success"],
-                ["Current due", s.due, s.due > 0 ? "text-danger" : "text-success"], ["Available advance", s.advance, "text-success"]].map(([l, v, col]) => (
-                <div key={l} className="card p-4"><p className="text-xs text-slate-500">{l}</p><p className={`text-xl font-bold ${col}`}>{formatMoney(v)}</p></div>
+            {/* সামারি কার্ড */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              {cards.map(({ l, v, icon: Icon, tone, ring, text, accent }) => (
+                <div key={l} className="card relative overflow-hidden p-4">
+                  {accent && <span className={`absolute inset-x-0 top-0 h-1 ${accent}`} aria-hidden />}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{l}</p>
+                    <span className={`no-print grid h-8 w-8 place-items-center rounded-lg ${ring}`}><Icon className="h-4 w-4" aria-hidden /></span>
+                  </div>
+                  <p className={`mt-2 truncate font-bold ${text ? "text-base" : "num text-xl"} ${tone}`}>{v}</p>
+                </div>
               ))}
             </div>
-            {s.due === 0 && s.advance === 0 && <div className="no-print mb-4"><Badge tone="success">All settled</Badge></div>}
 
-            <form onSubmit={receive} className="card no-print mb-5 p-5">
-              <h3 className="mb-3 text-sm font-bold text-navy-900">Receive Due Payment</h3>
-              <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_2fr_auto]">
+            {/* পেমেন্ট গ্রহণ */}
+            <form onSubmit={receive} className={`card no-print overflow-hidden ${s.due > 0 ? "border-emerald-200" : ""}`}>
+              <div className="card-header">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-50 text-emerald-600"><HandCoins className="h-4 w-4" aria-hidden /></span>
+                  <div>
+                    <h3 className="card-title">Receive Due Payment</h3>
+                    <p className="text-xs text-slate-500">{s.due > 0 ? <>Outstanding due: <b className="num text-rose-600">{formatMoney(s.due)}</b></> : "No due right now — any payment is kept as advance."}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid items-start gap-4 p-5 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_2fr_auto]">
                 <Input label="Payment amount" type="number" min="0" step="0.01" inputMode="decimal" value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} error={err} />
                 <Input label="Date" type="date" value={pay.date} onChange={(e) => setPay({ ...pay, date: e.target.value })} />
                 <Input label="Payment note" value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} />
-                <Button type="submit" loading={saving} variant="success" className="lg:mt-5">Save payment</Button>
+                <Button type="submit" loading={saving} variant="success" className="lg:mt-[22px]">Save payment</Button>
               </div>
-              <p className="mt-2 text-xs text-slate-500">Paying more than the due is kept as the customer&apos;s advance.</p>
+              <p className="px-5 pb-4 text-xs text-slate-500">Paying more than the due is kept as the customer&apos;s advance.</p>
             </form>
 
-            <div className="card overflow-hidden">
-              <h3 className="px-5 py-4 text-base font-bold text-navy-900">Purchase &amp; Due Ledger</h3>
-              {!d.entries.length ? <EmptyState title="No ledger entries found yet" hint="Sales, payments and old dues will appear here." /> : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[760px]">
-                    <thead><tr><th className="th">Date</th><th className="th">Type</th><th className="th">Description</th><th className="th text-right">Quantity</th><th className="th text-right">Total</th><th className="th text-right">Paid / Received</th><th className="th text-right">Balance due</th><th className="th">Note</th></tr></thead>
-                    <tbody className="divide-y divide-slate-100">
+            {/* লেজার */}
+            <section className="card overflow-hidden">
+              <div className="card-header">
+                <h3 className="card-title text-base">Purchase &amp; Due Ledger</h3>
+                <span className="badge badge-neutral num">{d.entries.length} entries</span>
+              </div>
+              {!d.entries.length ? <EmptyState icon={ReceiptText} title="No ledger entries found yet" hint="Sales, payments and old dues will appear here." /> : (
+                <div className="table-wrap print-expand max-h-[70vh]">
+                  <table className="w-full min-w-[860px]">
+                    <thead><tr>
+                      <th className="th">Date</th><th className="th">Type</th><th className="th">Description</th><th className="th text-right">Quantity</th>
+                      <th className="th text-right">Total</th><th className="th text-right">Paid / Received</th><th className="th text-right">Balance Due</th><th className="th">Note</th>
+                    </tr></thead>
+                    <tbody className="rows">
                       {d.entries.map((e) => (
                         <tr key={e.id}>
-                          <td className="td whitespace-nowrap">{formatDate(e.date)}</td>
+                          <td className="td num whitespace-nowrap text-slate-500">{formatDate(e.date)}</td>
                           <td className="td"><Badge tone={TYPE[e.type][1]}>{TYPE[e.type][0]}</Badge></td>
-                          <td className="td">{e.description}</td>
-                          <td className="td text-right">{e.qty || "—"}</td>
-                          <td className="td text-right">{e.total ? formatMoney(e.total) : "—"}</td>
-                          <td className="td text-right text-success">{e.received ? formatMoney(e.received) : "—"}</td>
-                          <td className={`td text-right font-semibold ${e.balance > 0 ? "text-danger" : "text-success"}`}>{e.balance < 0 ? `${formatMoney(-e.balance)} adv.` : formatMoney(e.balance)}</td>
+                          <td className="td text-navy-900">{e.description}</td>
+                          <td className="td num text-right">{e.qty || "—"}</td>
+                          <td className="td num text-right">{e.total ? formatMoney(e.total) : "—"}</td>
+                          <td className="td num text-right font-medium text-emerald-600">{e.received ? formatMoney(e.received) : "—"}</td>
+                          <td className={`td num text-right font-semibold ${e.balance > 0 ? "text-rose-600" : "text-emerald-600"}`}>{e.balance < 0 ? `${formatMoney(-e.balance)} adv.` : formatMoney(e.balance)}</td>
                           <td className="td text-slate-500">{e.note || "—"}</td>
                         </tr>
                       ))}
@@ -115,7 +171,7 @@ export default function CustomerLedgerPage() {
                   </table>
                 </div>
               )}
-            </div>
+            </section>
           </>
         )}
       </main>

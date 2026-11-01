@@ -53,7 +53,7 @@ export default function SupplierForm({ supplierId }) {
       <Textarea label="Address" name="address" placeholder="Enter complete supplier address" value={f.address} onChange={set("address")} />
       <Input label="Phone number" name="phone" inputMode="numeric" placeholder="e.g. 01XXXXXXXXX" value={f.phone} onChange={set("phone")} error={errors.phone} className="sm:max-w-xs" />
       <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-        <Link href="/suppliers" className="inline-flex min-h-[40px] items-center rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-200">Cancel</Link>
+        <Link href="/suppliers" className="inline-flex min-h-[40px] items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">Cancel</Link>
         <Button type="submit" loading={saving}>{supplierId ? "Update supplier" : "Save supplier"}</Button>
       </div>
     </form>

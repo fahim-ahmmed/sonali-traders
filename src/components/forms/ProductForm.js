@@ -98,7 +98,7 @@ export default function ProductForm({ productId }) {
         </p>
       )}
       <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-        <Link href="/products" className="inline-flex min-h-[40px] items-center rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-200">Cancel</Link>
+        <Link href="/products" className="inline-flex min-h-[40px] items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">Cancel</Link>
         <Button type="submit" loading={saving}>{productId ? "Update product" : "Save product"}</Button>
       </div>
     </form>

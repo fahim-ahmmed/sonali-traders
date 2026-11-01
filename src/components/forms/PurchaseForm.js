@@ -137,7 +137,7 @@ export default function PurchaseForm({ purchaseId }) {
         <p className="text-sm text-slate-500">Grand total <span className="ml-2 text-2xl font-bold text-navy-900">{formatMoney(grand)}</span></p>
       </div>
       <div className="flex justify-end gap-2">
-        <Link href="/purchases" className="inline-flex min-h-[40px] items-center rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-200">Cancel</Link>
+        <Link href="/purchases" className="inline-flex min-h-[40px] items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">Cancel</Link>
         <Button type="submit" loading={saving}>{purchaseId ? "Update purchase" : "Save purchase"}</Button>
       </div>
     </form>
