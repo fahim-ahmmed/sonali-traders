@@ -1,12 +1,13 @@
-// Dry-run: node --env-file=.env.local scripts/seed-all-customers.js
-// Import:   node --env-file=.env.local scripts/seed-all-customers.js --commit
-// This script never loads or prints environment files or credentials.
+// Run a read-only dry-run with the database connection supplied by the shell:
+// node scripts/seed-all-customers.js
+// Import after review: node scripts/seed-all-customers.js --commit
 import mongoose from "mongoose";
+import { performance } from "node:perf_hooks";
 import { connectDB, mongoClient } from "../src/lib/db.js";
 import Customer from "../src/models/Customer.js";
 import LedgerEntry from "../src/models/LedgerEntry.js";
 import { postEntry } from "../src/lib/ledger.js";
-import { withTx } from "../src/lib/tx.js";
+import { withTx } from "../src/lib/tx-core.js";
 
 const CUSTOMERS_DATA = [
   [
@@ -2275,6 +2276,7 @@ const EXPECTED = {
   advanceTaka: 1621648,
 };
 const shouldCommit = process.argv.includes("--commit");
+const diagnosticsOnly = process.argv.includes("--diagnose");
 
 const normalizePhone = (phone) => String(phone).replace(/\D/g, "");
 const customerKey = (name, phone) => `${String(name).trim().toLocaleLowerCase("en-US")}|${normalizePhone(phone)}`;
@@ -2331,6 +2333,36 @@ async function main() {
   const totals = validateSource();
   try {
     await connectDB();
+    if (diagnosticsOnly) {
+      await mongoClient.connect();
+      const hello = await mongoClient.db().admin().command({ hello: 1 });
+      let transactionSupported = false;
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          await Customer.countDocuments({}).session(session);
+        });
+        transactionSupported = true;
+      } finally {
+        await session.endSession();
+      }
+
+      const [customerCount, openingEntryCount] = await Promise.all([
+        Customer.countDocuments({}),
+        LedgerEntry.countDocuments({ type: { $in: ["opening_due", "advance"] } }),
+      ]);
+      console.log(JSON.stringify({
+        diagnostics: {
+          topology: hello.setName ? "replicaSet" : hello.msg === "isdbgrid" ? "mongos" : "unknown",
+          transactionSupported,
+          logicalSessionTimeoutMinutes: hello.logicalSessionTimeoutMinutes ?? null,
+          customerCount,
+          openingEntryCount,
+        },
+      }));
+      return;
+    }
+
     const existing = await Customer.find({}).select("name phone").lean();
     const conflicts = findConflicts(existing);
     if (conflicts.length) {
@@ -2351,70 +2383,86 @@ async function main() {
       return;
     }
 
+    const transactionStartedAt = performance.now();
     await withTx(async (session) => {
+      let stageStartedAt = performance.now();
+      const logStage = (stage) => {
+        const now = performance.now();
+        console.log(`Transaction stage ${stage}: ${Math.round(now - stageStartedAt)}ms elapsed; ${Math.round(now - transactionStartedAt)}ms total.`);
+        stageStartedAt = now;
+      };
+
       const current = await Customer.find({}).select("name phone").session(session).lean();
       const currentConflicts = findConflicts(current);
       if (currentConflicts.length) {
         throw new Error(`${currentConflicts.length} matching customer record(s) appeared before commit. Import stopped.`);
       }
+      logStage("conflict check");
 
-      const createdCustomers = [];
-      for (const [name, phone, address, dueTaka, advanceTaka, tag] of CUSTOMERS_DATA) {
-        const customer = new Customer({
+      const customers = await Customer.insertMany(CUSTOMERS_DATA.map(([name, phone, address, dueTaka, advanceTaka, tag]) => ({
           name,
           phone,
           address: address.trim(),
           tags: tag === "general" ? [] : ["cement"],
           balance: 0,
           active: true,
-        });
-        await customer.save({ session });
-        createdCustomers.push({ customer, dueTaka, advanceTaka });
+        })), { session, ordered: true });
+      logStage("customer insert");
+      const createdCustomers = customers.map((customer, index) => ({
+        customer,
+        dueTaka: CUSTOMERS_DATA[index][3],
+        advanceTaka: CUSTOMERS_DATA[index][4],
+      }));
+      if (createdCustomers.length !== CUSTOMERS_DATA.length || createdCustomers.some(({ customer }) => !customer?._id)) {
+        throw new Error("Customer insert did not return all generated IDs. Transaction will be rolled back.");
       }
 
+      const openingEntries = [];
       for (const { customer, dueTaka, advanceTaka } of createdCustomers) {
         if (dueTaka > 0) {
           const amount = dueTaka * 100;
-          await postEntry({
+          openingEntries.push({
             partyId: customer._id,
             date: OPENING_DATE,
             type: "opening_due",
             debit: amount,
             credit: 0,
             description: "Opening due balance",
-          }, session);
+          });
         } else if (advanceTaka > 0) {
           const amount = advanceTaka * 100;
-          await postEntry({
+          openingEntries.push({
             partyId: customer._id,
             date: OPENING_DATE,
             type: "advance",
             debit: 0,
             credit: amount,
             description: "Opening advance balance",
-          }, session);
+          });
         }
       }
+      await postEntry(openingEntries, session);
+      logStage("opening ledger entries");
 
       const ids = createdCustomers.map(({ customer }) => customer._id);
-      const [balanceTotals, actualLedgerCount] = await Promise.all([
-        Customer.aggregate([
-          { $match: { _id: { $in: ids } } },
-          { $group: {
-            _id: null,
-            due: { $sum: { $cond: [{ $gt: ["$balance", 0] }, "$balance", 0] } },
-            dueCount: { $sum: { $cond: [{ $gt: ["$balance", 0] }, 1, 0] } },
-            advance: { $sum: { $cond: [{ $lt: ["$balance", 0] }, { $multiply: ["$balance", -1] }, 0] } },
-          } },
-        ]).session(session),
-        LedgerEntry.countDocuments({ partyType: "customer", partyId: { $in: ids } }).session(session),
-      ]);
+      const balanceTotals = await Customer.aggregate([
+        { $match: { _id: { $in: ids } } },
+        { $group: {
+          _id: null,
+          due: { $sum: { $cond: [{ $gt: ["$balance", 0] }, "$balance", 0] } },
+          dueCount: { $sum: { $cond: [{ $gt: ["$balance", 0] }, 1, 0] } },
+          advance: { $sum: { $cond: [{ $lt: ["$balance", 0] }, { $multiply: ["$balance", -1] }, 0] } },
+        } },
+      ]).session(session);
+      const actualLedgerCount = await LedgerEntry.countDocuments({ partyType: "customer", partyId: { $in: ids } }).session(session);
+      logStage("balance verification queries");
       const actual = balanceTotals[0] || { due: 0, dueCount: 0, advance: 0 };
       if (actual.due !== totals.dueTaka * 100 || actual.dueCount !== totals.dueCount ||
           actual.advance !== totals.advanceTaka * 100 || actualLedgerCount !== ledgerEntries) {
         throw new Error("Post-import balance or ledger verification failed. Transaction will be rolled back.");
       }
     });
+    console.log(`Transaction completed in ${Math.round(performance.now() - transactionStartedAt)}ms.`);
 
     console.log(`Import complete: ${CUSTOMERS_DATA.length} customers and ${ledgerEntries} opening ledger entries.`);
     console.log(`Verified receivable due: ৳${totals.dueTaka.toLocaleString("en-US")} across ${totals.dueCount} customers.`);
@@ -2425,6 +2473,12 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : "Customer import failed.");
+  console.error(JSON.stringify({
+    name: error?.name || "Error",
+    message: error instanceof Error ? error.message : "Customer import failed.",
+    code: error?.code,
+    errorLabels: error?.errorLabels || [],
+    cause: error?.cause instanceof Error ? error.cause.message : undefined,
+  }));
   process.exitCode = 1;
 });
