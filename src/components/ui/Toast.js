@@ -17,9 +17,11 @@ export function ToastProvider({ children }) {
       {children}
       <div className="no-print fixed bottom-4 right-4 z-[60] flex flex-col gap-2" role="status" aria-live="polite">
         {items.map((t) => (
-          <div key={t.id} className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-card ${t.type === "error" ? "bg-danger" : "bg-success"}`}>
-            {t.type === "error" ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-            {t.message}
+          <div key={t.id} className={`flex animate-scale-in items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium shadow-card-hover ${t.type === "error" ? "border-rose-200 bg-white text-rose-700" : "border-emerald-200 bg-white text-emerald-700"}`}>
+            <span className={`grid h-6 w-6 place-items-center rounded-full ${t.type === "error" ? "bg-rose-50" : "bg-emerald-50"}`}>
+              {t.type === "error" ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+            </span>
+            <span className="text-slate-700">{t.message}</span>
           </div>
         ))}
       </div>

@@ -32,13 +32,13 @@ export default function Combobox({ options, value, onSelect, placeholder = "Sear
         onKeyDown={onKeyDown}
       />
       {open && (
-        <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-card" role="listbox">
+        <ul className="absolute z-30 mt-1.5 max-h-64 w-full animate-scale-in overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-card-hover" role="listbox">
           {!list.length && <li className="px-3 py-2 text-xs text-slate-500">No match</li>}
           {list.map((o, i) => (
             <li key={o.value} role="option" aria-selected={i === hi}
               onMouseDown={(e) => { e.preventDefault(); choose(o); }} onMouseEnter={() => setHi(i)}
-              className={`cursor-pointer px-3 py-2 text-sm ${i === hi ? "bg-brand-50" : ""}`}>
-              {o.label}{o.sub && <span className="ml-2 text-xs text-slate-400">{o.sub}</span>}
+              className={`cursor-pointer rounded-lg px-3 py-2 text-sm transition-colors ${i === hi ? "bg-brand-50 text-navy-900" : "text-slate-700"}`}>
+              {o.label}{o.sub && <span className="num ml-2 text-xs text-slate-400">{o.sub}</span>}
             </li>
           ))}
         </ul>
