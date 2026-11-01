@@ -26,13 +26,13 @@ export default async function AppLayout({ children }) {
   const st = subscriptionStatus(sub);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-canvas">
       <Suspense fallback={null}><Sidebar user={user} company={company} pending={pending} /></Suspense>
       <div className="md:pl-64 print:pl-0">
         {isAdmin && (st.state === "expiring" || st.state === "expired") && (
-          <div role="alert" className={`no-print px-5 py-2 text-center text-xs font-semibold ${st.state === "expired" ? "bg-danger text-white" : "bg-warning text-navy-900"}`}>
-            {st.state === "expired" ? "Your subscription has expired." : `Your subscription ends in ${st.days} day${st.days === 1 ? "" : "s"}.`}{" "}
-            <Link href="/subscription" className="underline">View details</Link>
+          <div role="alert" className={`no-print flex items-center justify-center gap-2 px-5 py-2 text-center text-xs font-semibold ${st.state === "expired" ? "bg-danger text-white" : "bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-600/20"}`}>
+            {st.state === "expired" ? "Your subscription has expired." : `Your subscription ends in ${st.days} day${st.days === 1 ? "" : "s"}.`}
+            <Link href="/subscription" className="rounded-full bg-white/20 px-2 py-0.5 underline-offset-2 hover:underline">View details →</Link>
           </div>
         )}
         {children}
