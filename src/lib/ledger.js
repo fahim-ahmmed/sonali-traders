@@ -1,6 +1,6 @@
-import Customer from "@/models/Customer";
-import LedgerEntry from "@/models/LedgerEntry";
-import { AppError } from "./tx";
+import Customer from "../models/Customer.js";
+import LedgerEntry from "../models/LedgerEntry.js";
+import { AppError } from "./tx.js";
 
 // balance = Σ debit − Σ credit । সব কাস্টমার-লেনদেন এই একটি ফাংশন দিয়ে (Sale approve-ও ধাপ ৫/৬-এ)
 // customer.balance atomic $inc, তাই balanceAfter সবসময় সঠিক।
