@@ -1,6 +1,8 @@
 "use client";
 import { useParams } from "next/navigation";
+import { PackageCheck } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
+import FormCard from "@/components/layout/FormCard";
 import ProductForm from "@/components/forms/ProductForm";
 
 export default function EditProductPage() {
@@ -8,11 +10,10 @@ export default function EditProductPage() {
   return (
     <>
       <PageHeader group="Product / Edit Product" title="Product management" />
-      <main className="p-5 sm:p-8">
-        <div className="card max-w-2xl p-6">
-          <h2 className="mb-5 text-lg font-bold text-navy-900">Edit Product</h2>
+      <main className="page">
+        <FormCard title="Edit Product" subtitle="Update pricing, brand and stock settings." icon={PackageCheck} backHref="/products" backLabel="Product List">
           <ProductForm productId={id} />
-        </div>
+        </FormCard>
       </main>
     </>
   );

@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -65,43 +66,59 @@ export default function AddCategoryPage() {
   return (
     <>
       <PageHeader group="Product / Category" title="Product management" />
-      <main className="space-y-6 p-5 sm:p-8">
-        <div className="card max-w-3xl p-6">
-          <h2 className="text-lg font-bold text-navy-900">Add Category</h2>
-          <p className="mb-5 text-sm text-slate-500">Create product categories and brands.</p>
-          <form onSubmit={save} className="grid items-start gap-4 sm:grid-cols-[1fr_1fr_auto]">
-            <Input label="Category name" name="category" placeholder="e.g. Rod" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} error={errors.category} />
-            <Input label="Brand name" name="brand" placeholder="e.g. BSRM" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} error={errors.brand} />
-            <Button type="submit" loading={saving} className="sm:mt-5">Save category</Button>
-          </form>
+      <main className="page">
+        <div>
+          <h2 className="page-title">Category &amp; Brand</h2>
+          <p className="page-subtitle">Every product belongs to one category–brand pair, e.g. Rod — BSRM.</p>
         </div>
-
-        <div className="card max-w-3xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4">
-            <h2 className="text-base font-bold text-navy-900">Category List</h2>
-            {items && <span className="text-xs text-slate-500">{items.length} total</span>}
-          </div>
-          {!items ? <div className="space-y-2 p-5"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
-            : !items.length ? <EmptyState title="No categories yet" hint="Add your first category and brand above." />
-            : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead><tr><th className="th">Category</th><th className="th">Brand</th><th className="th text-right">Actions</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {items.map((c) => (
-                      <tr key={c.id} className="hover:bg-slate-50">
-                        <td className="td font-semibold">{c.category}</td>
-                        <td className="td">{c.brand}</td>
-                        <td className="td text-right">
-                          <button onClick={() => setEditing({ ...c })} className="mr-2 rounded-md bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100">Edit</button>
-                          <button onClick={() => setDeleting(c)} className="rounded-md bg-red-50 px-3 py-1 text-xs font-semibold text-danger hover:bg-red-100">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        <div className="grid items-start gap-6 lg:grid-cols-5">
+          <section className="card lg:col-span-2">
+            <div className="card-header">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 ring-1 ring-inset ring-brand-600/10"><Tags className="h-5 w-5" aria-hidden /></span>
+                <div>
+                  <h3 className="text-base font-semibold text-navy-900">Add Category</h3>
+                  <p className="mt-0.5 text-xs text-slate-500">Create product categories and brands.</p>
+                </div>
               </div>
-            )}
+            </div>
+            <form onSubmit={save} className="space-y-4 p-5">
+              <Input label="Category name" name="category" placeholder="e.g. Rod" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} error={errors.category} />
+              <Input label="Brand name" name="brand" placeholder="e.g. BSRM" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} error={errors.brand} />
+              <Button type="submit" loading={saving} className="w-full"><Plus className="h-4 w-4" aria-hidden /> Save category</Button>
+              <p className="text-xs text-slate-500">Tip: the category stays filled after saving, so you can add several brands in a row.</p>
+            </form>
+          </section>
+
+          <section className="card overflow-hidden lg:col-span-3">
+            <div className="card-header">
+              <h3 className="card-title text-base">Category List</h3>
+              {items && <span className="badge badge-neutral num">{items.length} total</span>}
+            </div>
+            {!items ? <div className="space-y-2 p-5"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+              : !items.length ? <EmptyState icon={Tags} title="No categories yet" hint="Add your first category and brand using the form." />
+              : (
+                <div className="table-wrap max-h-[65vh]">
+                  <table className="w-full">
+                    <thead><tr><th className="th">Category</th><th className="th">Brand</th><th className="th text-right">Actions</th></tr></thead>
+                    <tbody className="rows">
+                      {items.map((c) => (
+                        <tr key={c.id}>
+                          <td className="td"><span className={`badge ${String(c.category).toUpperCase() === "ROD" ? "badge-neutral" : "badge-warning"}`}>{c.category}</span></td>
+                          <td className="td font-medium text-navy-900">{c.brand}</td>
+                          <td className="td text-right">
+                            <div className="inline-flex gap-1.5">
+                              <button onClick={() => setEditing({ ...c })} aria-label={`Edit ${c.category} ${c.brand}`} title="Edit" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-brand-100 hover:bg-brand-50 hover:text-brand-700"><Pencil className="h-3.5 w-3.5" /></button>
+                              <button onClick={() => setDeleting(c)} aria-label={`Delete ${c.category} ${c.brand}`} title="Delete" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+          </section>
         </div>
       </main>
 

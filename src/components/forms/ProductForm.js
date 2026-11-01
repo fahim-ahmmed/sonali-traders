@@ -67,7 +67,7 @@ export default function ProductForm({ productId }) {
 
   if (!cats.length) {
     return (
-      <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
+      <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800 ring-1 ring-inset ring-amber-600/20">
         No categories yet. <Link href="/products/categories/create" className="font-semibold underline">Add a category and brand</Link> first.
       </div>
     );
@@ -93,7 +93,7 @@ export default function ProductForm({ productId }) {
         <Input label="Selling price" name="sell" type="number" step="0.01" min="0" inputMode="decimal" placeholder="0.00" value={f.sell} onChange={(e) => setF({ ...f, sell: e.target.value })} error={errors.sell} />
       </div>
       {warn && (
-        <p className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <p className="flex items-center gap-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800 ring-1 ring-inset ring-amber-600/20">
           <AlertTriangle className="h-4 w-4" /> Selling price is lower than buying price. You can still save.
         </p>
       )}

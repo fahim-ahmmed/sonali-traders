@@ -91,7 +91,7 @@ export default function StaffForm({ staffId }) {
             <div className="relative">
               <Input label="Password" type={show ? "text" : "password"} autoComplete="new-password" value={f.password} onChange={set("password")} error={errors.password}
                 hint={f.password ? `Strength: ${strength(f.password)}` : "At least 8 characters"} />
-              <button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"} className="absolute right-3 top-8 text-slate-500">{show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+              <button type="button" onClick={() => setShow(!show)} aria-label={show ? "Hide password" : "Show password"} className="absolute right-3 top-[34px] rounded-md p-0.5 text-slate-400 transition-colors hover:text-navy-900">{show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
             </div>
           )}
         </div>
@@ -103,8 +103,9 @@ export default function StaffForm({ staffId }) {
       </form>
 
       {staffId && (
-        <div className="mt-6 rounded-lg border border-slate-200 p-4">
-          <h3 className="mb-2 text-sm font-bold text-navy-900">Reset password</h3>
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50/40 p-4">
+          <h3 className="text-sm font-semibold text-navy-900">Reset password</h3>
+          <p className="mb-3 text-xs text-slate-500">The staff member will need the new password to sign in again.</p>
           <div className="flex flex-wrap items-end gap-3">
             <Input label="New password" type="password" autoComplete="new-password" value={newPw} onChange={(e) => setNewPw(e.target.value)} className="w-full sm:max-w-xs" />
             <Button type="button" variant="gold" loading={resetting} onClick={resetPassword}>Reset password</Button>

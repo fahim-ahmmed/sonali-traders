@@ -1,6 +1,8 @@
 "use client";
 import { useParams } from "next/navigation";
+import { UserCog } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
+import FormCard from "@/components/layout/FormCard";
 import StaffForm from "@/components/forms/StaffForm";
 
 export default function EditStaffPage() {
@@ -8,11 +10,10 @@ export default function EditStaffPage() {
   return (
     <>
       <PageHeader group="Staff / Edit Staff" title="Team management" />
-      <main className="p-5 sm:p-8">
-        <div className="card max-w-3xl p-6">
-          <h2 className="mb-5 text-lg font-bold text-navy-900">Edit Staff</h2>
+      <main className="page">
+        <FormCard wide title="Edit Staff" subtitle="Update details, permissions or reset the password." icon={UserCog} backHref={`/staff/${id}`} backLabel="Staff Profile">
           <StaffForm staffId={id} />
-        </div>
+        </FormCard>
       </main>
     </>
   );

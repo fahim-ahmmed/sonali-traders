@@ -1,6 +1,8 @@
 "use client";
 import { useParams } from "next/navigation";
+import { ShoppingBasket } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
+import FormCard from "@/components/layout/FormCard";
 import PurchaseForm from "@/components/forms/PurchaseForm";
 
 export default function EditPurchasePage() {
@@ -8,11 +10,10 @@ export default function EditPurchasePage() {
   return (
     <>
       <PageHeader group="Purchase / Edit Purchase" title="Purchase management" />
-      <main className="p-5 sm:p-8">
-        <div className="card max-w-4xl p-6">
-          <h2 className="mb-5 text-lg font-bold text-navy-900">Edit Purchase</h2>
+      <main className="page">
+        <FormCard wide title="Edit Purchase" subtitle="Change supplier, products or payment for this purchase." icon={ShoppingBasket} backHref="/purchases" backLabel="Purchase List">
           <PurchaseForm purchaseId={id} />
-        </div>
+        </FormCard>
       </main>
     </>
   );

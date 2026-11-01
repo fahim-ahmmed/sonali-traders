@@ -1,6 +1,8 @@
 "use client";
 import { useParams } from "next/navigation";
+import { Truck } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
+import FormCard from "@/components/layout/FormCard";
 import SupplierForm from "@/components/forms/SupplierForm";
 
 export default function EditSupplierPage() {
@@ -8,11 +10,10 @@ export default function EditSupplierPage() {
   return (
     <>
       <PageHeader group="Supplier / Edit Supplier" title="Supplier management" />
-      <main className="p-5 sm:p-8">
-        <div className="card max-w-2xl p-6">
-          <h2 className="mb-5 text-lg font-bold text-navy-900">Edit Supplier</h2>
+      <main className="page">
+        <FormCard title="Edit Supplier" subtitle="Update supplier contact details." icon={Truck} backHref="/suppliers" backLabel="Supplier List">
           <SupplierForm supplierId={id} />
-        </div>
+        </FormCard>
       </main>
     </>
   );

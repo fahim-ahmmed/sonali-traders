@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Eye, Pencil, Plus, ShoppingBasket, Trash2 } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
 import Pagination from "@/components/ui/Pagination";
 import Modal, { ConfirmDialog } from "@/components/ui/Modal";
@@ -34,35 +34,46 @@ export default function PurchaseListPage() {
   return (
     <>
       <PageHeader group="Purchase / Purchase List" title="Purchase management" />
-      <main className="p-5 sm:p-8">
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <main className="page">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-navy-900">Purchase List</h2>
-            <p className="text-sm text-slate-500">View and manage every supplier purchase and its products.</p>
+            <h2 className="page-title">Purchase List</h2>
+            <p className="page-subtitle">View and manage every supplier purchase and its products.</p>
           </div>
-          <Link href="/purchases/create" className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-semibold text-white hover:bg-brand-700"><Plus className="h-4 w-4" /> New Purchase</Link>
+          <Link href="/purchases/create" className="inline-flex min-h-[40px] items-center gap-2 rounded-xl bg-gradient-to-b from-brand-500 to-brand-600 px-4 text-sm font-semibold text-white shadow-sm shadow-brand-600/25 transition-all hover:shadow-md active:scale-[.98]"><Plus className="h-4 w-4" /> New Purchase</Link>
         </div>
         <div className="card overflow-hidden">
-          {!data ? <div className="space-y-2 p-5">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
-            : !data.items.length ? <EmptyState title="No purchases added yet" hint="Record a supplier purchase to add stock." actionHref="/purchases/create" actionLabel="New purchase" />
+          {!data ? <div className="space-y-2 p-5">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
+            : !data.items.length ? <EmptyState icon={ShoppingBasket} title="No purchases added yet" hint="Record a supplier purchase to add stock and track supplier dues." actionHref="/purchases/create" actionLabel="New Purchase" />
             : (
-              <div className="max-h-[70vh] overflow-auto">
-                <table className="w-full min-w-[640px]">
-                  <thead><tr><th className="th">Date</th><th className="th">Supplier</th><th className="th">Company</th><th className="th text-right">Total amount</th><th className="th text-right">Actions</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {data.items.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50">
-                        <td className="td">{formatDate(p.date)}</td>
-                        <td className="td font-semibold text-navy-900">{p.supplier}</td>
-                        <td className="td">{p.company || "—"}</td>
-                        <td className="td text-right font-semibold">{formatMoney(p.grandTotal)}</td>
-                        <td className="td whitespace-nowrap text-right">
-                          <button onClick={() => setViewing(p)} className="mr-2 text-xs font-semibold text-brand-600 hover:underline">View</button>
-                          <Link href={`/purchases/${p.id}/edit`} className="mr-2 rounded-md bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100">Edit</Link>
-                          <button onClick={() => setDeleting(p)} className="rounded-md bg-red-50 px-3 py-1 text-xs font-semibold text-danger hover:bg-red-100">Delete</button>
-                        </td>
-                      </tr>
-                    ))}
+              <div className="table-wrap max-h-[70vh]">
+                <table className="w-full min-w-[820px]">
+                  <thead><tr><th className="th">Date</th><th className="th">Supplier</th><th className="th">Company</th><th className="th text-right">Total Amount</th><th className="th text-right">Supplier Due</th><th className="th text-right">Actions</th></tr></thead>
+                  <tbody className="rows">
+                    {data.items.map((p) => {
+                      const dueAmt = p.grandTotal - p.paidAmount;
+                      return (
+                        <tr key={p.id}>
+                          <td className="td num text-slate-500">{formatDate(p.date)}</td>
+                          <td className="td">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-navy-900">{p.supplier}</span>
+                              {!p.stockControl && <span className="badge badge-neutral">Record only</span>}
+                            </div>
+                          </td>
+                          <td className="td text-slate-600">{p.company || "—"}</td>
+                          <td className="td num text-right font-semibold text-navy-900">{formatMoney(p.grandTotal)}</td>
+                          <td className="td text-right">{dueAmt > 0 ? <span className="badge badge-danger num">{formatMoney(dueAmt)}</span> : <span className="badge badge-success">Paid</span>}</td>
+                          <td className="td whitespace-nowrap text-right">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button onClick={() => setViewing(p)} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition-colors hover:bg-brand-50"><Eye className="h-3.5 w-3.5" aria-hidden /> View</button>
+                              <Link href={`/purchases/${p.id}/edit`} aria-label="Edit purchase" title="Edit" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-brand-100 hover:bg-brand-50 hover:text-brand-700"><Pencil className="h-3.5 w-3.5" /></Link>
+                              <button onClick={() => setDeleting(p)} aria-label="Delete purchase" title="Delete" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -71,19 +82,23 @@ export default function PurchaseListPage() {
         </div>
       </main>
 
-      <Modal open={!!viewing} onClose={() => setViewing(null)} title={viewing ? `${viewing.supplier} — ${formatDate(viewing.date)}` : ""}>
+      <Modal size="lg" open={!!viewing} onClose={() => setViewing(null)} title={viewing ? `${viewing.supplier} — ${formatDate(viewing.date)}` : ""}>
         {viewing && (
-          <div className="text-sm">
-            <table className="w-full">
-              <thead><tr><th className="th">Product</th><th className="th text-right">Qty</th><th className="th text-right">Price</th><th className="th text-right">Total</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {viewing.items.map((i, k) => <tr key={k}><td className="td">{i.name}</td><td className="td text-right">{i.qty}</td><td className="td text-right">{formatMoney(i.buyPrice)}</td><td className="td text-right">{formatMoney(i.lineTotal)}</td></tr>)}
-              </tbody>
-            </table>
-            <p className="mt-3 flex justify-between font-bold text-navy-900"><span>Grand total</span><span>{formatMoney(viewing.grandTotal)}</span></p>
-            <p className="flex justify-between text-slate-600"><span>Paid</span><span>{formatMoney(viewing.paidAmount)}</span></p>
-            <p className="flex justify-between text-slate-600"><span>Supplier due</span><span>{formatMoney(viewing.grandTotal - viewing.paidAmount)}</span></p>
-            <p className="mt-2 text-xs text-slate-500">{viewing.stockControl ? "Stock was added." : "Record only — stock not changed."}</p>
+          <div className="space-y-4 text-sm">
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <table className="w-full">
+                <thead><tr><th className="th">Product</th><th className="th text-right">Qty</th><th className="th text-right">Price</th><th className="th text-right">Total</th></tr></thead>
+                <tbody className="rows">
+                  {viewing.items.map((i, k) => <tr key={k}><td className="td text-navy-900">{i.name}</td><td className="td num text-right">{i.qty}</td><td className="td num text-right">{formatMoney(i.buyPrice)}</td><td className="td num text-right font-medium">{formatMoney(i.lineTotal)}</td></tr>)}
+                </tbody>
+              </table>
+            </div>
+            <dl className="space-y-1.5 rounded-xl bg-slate-50 p-4">
+              <div className="flex justify-between font-semibold text-navy-900"><dt>Grand total</dt><dd className="num">{formatMoney(viewing.grandTotal)}</dd></div>
+              <div className="flex justify-between text-slate-600"><dt>Paid</dt><dd className="num text-emerald-600">{formatMoney(viewing.paidAmount)}</dd></div>
+              <div className="flex justify-between text-slate-600"><dt>Supplier due</dt><dd className="num text-rose-600">{formatMoney(viewing.grandTotal - viewing.paidAmount)}</dd></div>
+            </dl>
+            <p className="text-xs text-slate-500">{viewing.stockControl ? "Stock was added." : "Record only — stock not changed."}</p>
           </div>
         )}
       </Modal>

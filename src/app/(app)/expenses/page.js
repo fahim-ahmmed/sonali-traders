@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { Pencil, Plus, Receipt, Trash2, X } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
 import Pagination from "@/components/ui/Pagination";
 import Button from "@/components/ui/Button";
@@ -82,11 +83,23 @@ export default function ExpensesPage() {
   return (
     <>
       <PageHeader group="Expenses" title="Business expenses" />
-      <main className="space-y-6 p-5 sm:p-8">
-        <div className="card max-w-4xl p-6">
-          <h2 className="text-lg font-bold text-navy-900">Add Expense</h2>
-          <p className="mb-4 text-sm text-slate-500">Record business expenses by staff or administrator.</p>
-          <form onSubmit={save} className="space-y-4">
+      <main className="page">
+        <div>
+          <h2 className="page-title">Expenses</h2>
+          <p className="page-subtitle">Record business expenses by staff or administrator.</p>
+        </div>
+
+        <section className="card">
+          <div className="card-header">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-orange-50 to-amber-100 text-orange-600 ring-1 ring-inset ring-orange-600/10"><Receipt className="h-5 w-5" aria-hidden /></span>
+              <div>
+                <h3 className="text-base font-semibold text-navy-900">Add Expense</h3>
+                <p className="mt-0.5 text-xs text-slate-500">It shows up in today&apos;s dashboard, reports and accounts.</p>
+              </div>
+            </div>
+          </div>
+          <form onSubmit={save} className="space-y-4 p-5">
             <div className="grid gap-4 sm:grid-cols-3">
               {isAdmin && (
                 <Select label="Paid by" value={f.paidById} onChange={(e) => setF({ ...f, paidById: e.target.value })}>
@@ -96,7 +109,7 @@ export default function ExpensesPage() {
                 </Select>
               )}
               <Input label="Expense date" type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} error={errors.date} />
-              <Input label="Amount" type="number" min="0" step="0.01" inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} error={errors.amount} />
+              <Input label="Amount" type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} error={errors.amount} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -105,46 +118,65 @@ export default function ExpensesPage() {
               </div>
               <Input label="Note (optional)" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} />
             </div>
-            <Button type="submit" loading={saving} className="w-full sm:w-auto">Save Expense</Button>
+            <div className="flex justify-end border-t border-slate-100 pt-4">
+              <Button type="submit" loading={saving} className="w-full sm:w-auto"><Plus className="h-4 w-4" aria-hidden /> Save Expense</Button>
+            </div>
           </form>
-        </div>
+        </section>
 
-        <div className="card overflow-hidden">
-          <div className="flex flex-wrap items-end justify-between gap-3 p-5">
-            <h2 className="text-base font-bold text-navy-900">Expense History</h2>
+        <section className="card overflow-hidden">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 px-5 py-4">
+            <div className="flex items-center gap-2">
+              <h3 className="card-title text-base">Expense History</h3>
+              {data && <span className="badge badge-danger num">{formatMoney(data.totalAmount)}</span>}
+            </div>
             <div className="flex flex-wrap items-end gap-3">
               <Input label="From" type="date" value={range.from} onChange={(e) => { setRange({ ...range, from: e.target.value }); setPage(1); }} />
               <Input label="To" type="date" value={range.to} onChange={(e) => { setRange({ ...range, to: e.target.value }); setPage(1); }} />
+              {(range.from || range.to) && <Button variant="ghost" onClick={() => { setRange({ from: "", to: "" }); setPage(1); }}><X className="h-4 w-4" aria-hidden /> Clear</Button>}
             </div>
           </div>
-          {!data ? <div className="space-y-2 p-5"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
-            : !data.items.length ? <EmptyState title="No expenses recorded yet" hint="Saved expenses will appear here." />
+          {!data ? <div className="space-y-2 p-5"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>
+            : !data.items.length ? <EmptyState icon={Receipt} title="No expenses recorded yet" hint="Saved expenses will appear here." />
             : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px]">
-                  <thead><tr><th className="th">Date</th><th className="th">Paid by</th><th className="th">Expense for</th><th className="th">Note</th><th className="th text-right">Amount</th>{isAdmin && <th className="th text-right">Actions</th>}</tr></thead>
-                  <tbody className="divide-y divide-slate-100">
+              <div className="table-wrap max-h-[65vh]">
+                <table className="w-full min-w-[720px]">
+                  <thead><tr><th className="th">Date</th><th className="th">Paid By</th><th className="th">Expense For</th><th className="th">Note</th><th className="th text-right">Amount</th>{isAdmin && <th className="th text-right">Actions</th>}</tr></thead>
+                  <tbody className="rows">
                     {data.items.map((x) => (
-                      <tr key={x.id} className="hover:bg-slate-50">
-                        <td className="td whitespace-nowrap">{formatDate(x.date)}</td><td className="td">{x.paidByName}</td><td className="td font-semibold">{x.purpose}</td><td className="td text-slate-500">{x.note || "—"}</td>
-                        <td className="td text-right font-semibold">{formatMoney(x.amount)}</td>
+                      <tr key={x.id}>
+                        <td className="td num whitespace-nowrap text-slate-500">{formatDate(x.date)}</td>
+                        <td className="td">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">{(x.paidByName || "?").slice(0, 2).toUpperCase()}</span>
+                            {x.paidByName}
+                          </span>
+                        </td>
+                        <td className="td font-semibold text-navy-900">{x.purpose}</td>
+                        <td className="td text-slate-500">{x.note || "—"}</td>
+                        <td className="td num text-right font-semibold text-navy-900">{formatMoney(x.amount)}</td>
                         {isAdmin && <td className="td whitespace-nowrap text-right">
-                          <button onClick={() => setEditing({ ...x, date: dhakaDateKey(new Date(x.date)), amount: String(toTaka(x.amount)) })} className="mr-2 rounded-md bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-100">Edit</button>
-                          <button onClick={() => setDeleting(x)} className="rounded-md bg-red-50 px-3 py-1 text-xs font-semibold text-danger hover:bg-red-100">Delete</button></td>}
+                          <div className="inline-flex gap-1.5">
+                            <button onClick={() => setEditing({ ...x, date: dhakaDateKey(new Date(x.date)), amount: String(toTaka(x.amount)) })} aria-label="Edit expense" title="Edit"
+                              className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-brand-100 hover:bg-brand-50 hover:text-brand-700"><Pencil className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => setDeleting(x)} aria-label="Delete expense" title="Delete"
+                              className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </div>
+                        </td>}
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot><tr className="bg-slate-50"><td className="td font-bold" colSpan={4}>Total{range.from || range.to ? " (selected dates)" : ""}</td><td className="td text-right font-bold">{formatMoney(data.totalAmount)}</td>{isAdmin && <td />}</tr></tfoot>
+                  <tfoot><tr className="bg-slate-50"><td className="td font-semibold text-navy-900" colSpan={4}>Total{range.from || range.to ? " (selected dates)" : ""}</td><td className="td num text-right font-bold text-navy-900">{formatMoney(data.totalAmount)}</td>{isAdmin && <td />}</tr></tfoot>
                 </table>
               </div>
             )}
           {data && <Pagination page={data.page} pages={data.pages} total={data.total} onChange={setPage} />}
-        </div>
+        </section>
       </main>
 
       <Modal open={!!editing} onClose={() => setEditing(null)} title="Edit expense">
         {editing && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <Select label="Paid by" value={editing.paidById} onChange={(e) => setEditing({ ...editing, paidById: e.target.value })}>
               {admins.length > 0 && <optgroup label="Admin">{admins.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>}
               {staff.length > 0 && <optgroup label="Staff">{staff.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>}
