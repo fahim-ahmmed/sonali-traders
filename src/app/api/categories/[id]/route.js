@@ -18,7 +18,11 @@ export async function PUT(req, { params }) {
   const parsed = schema.safeParse(await req.json());
   if (!parsed.success) return fail(parsed.error.issues[0].message, 422);
   await connectDB();
-  const dup = await Category.findOne({ _id: { $ne: id }, category: parsed.data.category.toUpperCase(), brand: parsed.data.brand });
+  const dup = await Category.findOne({
+    _id: { $ne: id },
+    category: parsed.data.category.toUpperCase(),
+    brand: new RegExp(`^${parsed.data.brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
+  });
   if (dup) return fail("This category and brand already exist", 409);
   const c = await Category.findByIdAndUpdate(id, parsed.data, { new: true });
   if (!c) return fail("Not found", 404);

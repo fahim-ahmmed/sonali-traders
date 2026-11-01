@@ -26,12 +26,20 @@ export async function POST(req) {
       if (!customer || !customer.active) throw new AppError("Customer not found", 422);
 
       const ids = [...new Set(d.items.map((i) => i.productId))];
-      const products = await Product.find({ _id: { $in: ids }, active: true }).populate("categoryId", "category").session(session);
+      const products = await Product.find({ _id: { $in: ids }, active: true }).populate("categoryId", "category brand").session(session);
       const pmap = new Map(products.map((p) => [String(p._id), p]));
       const items = d.items.map((i) => {
         const p = pmap.get(i.productId);
         if (!p) throw new AppError("A selected product no longer exists", 422);
-        return { productId: p._id, name: p.name, category: (p.categoryId?.category || "").toLowerCase(), qty: i.qty, rate: i.rate, lineTotal: Math.round(i.qty * i.rate) };
+        return {
+          productId: p._id,
+          name: p.name,
+          category: p.categoryId?.category || "",
+          brand: p.categoryId?.brand || p.brand,
+          qty: i.qty,
+          rate: i.rate,
+          lineTotal: Math.round(i.qty * i.rate),
+        };
       });
       const total = items.reduce((s, i) => s + i.lineTotal, 0); // সার্ভারে পুনরায় হিসাব
 

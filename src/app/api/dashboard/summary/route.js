@@ -30,7 +30,11 @@ export async function GET() {
   ]);
 
   let rod = 0, cement = 0;
-  for (const s of sales) for (const i of s.items) { if (i.category === "rod") rod += i.qty; else if (i.category === "cement") cement += i.qty; }
+  for (const s of sales) for (const i of s.items) {
+    const category = String(i.category || "").toUpperCase();
+    if (category === "ROD") rod += i.qty;
+    else if (category === "CEMENT") cement += i.qty;
+  }
   const todaySale = sales.reduce((a, s) => a + s.total, 0);
   const paymentCredit = ledger.find((l) => l._id === "payment")?.credit || 0;
   const saleCredit = ledger.find((l) => l._id === "sale")?.credit || 0;

@@ -4,7 +4,10 @@ const ItemSchema = new mongoose.Schema(
   {
     productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
     name: String, // নামের snapshot
+    category: String, // category snapshot
+    brand: String, // brand snapshot
     qty: { type: Number, required: true },
+    rate: { type: Number, required: true }, // rate snapshot in paisa
     buyPrice: { type: Number, required: true }, // পয়সা
     lineTotal: { type: Number, required: true }, // পয়সা
   },

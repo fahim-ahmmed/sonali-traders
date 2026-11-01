@@ -24,6 +24,14 @@ export const purchaseDto = (p, s) => ({
   stockControl: p.stockControl,
   grandTotal: p.grandTotal,
   paidAmount: p.paidAmount,
-  items: p.items.map((i) => ({ productId: String(i.productId), name: i.name, qty: i.qty, buyPrice: i.buyPrice, lineTotal: i.lineTotal })),
+  items: p.items.map((i) => ({
+    productId: String(i.productId),
+    name: i.name,
+    category: i.category || "",
+    brand: i.brand || "",
+    qty: i.qty,
+    rate: i.rate ?? i.buyPrice,
+    buyPrice: i.buyPrice,
+    lineTotal: i.lineTotal,
+  })),
 });
-

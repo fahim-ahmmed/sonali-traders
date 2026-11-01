@@ -5,7 +5,7 @@ import { isValidId } from "./ids.js";
 export const productSchema = z.object({
   name: z.string().trim().min(1, "Product name is required").max(120),
   categoryId: z.string().refine(isValidId, "Select a category and brand"),
-  buyPrice: z.number().int().min(0, "Buying price can't be negative").optional().default(0),
+  buyPrice: z.number().int().min(0, "Buying price can't be negative").nullable().optional().default(null),
   sellPrice: z.number().int().min(0, "Selling price can't be negative"),
 });
 
@@ -15,7 +15,7 @@ export const productDto = (p, cat) => ({
   categoryId: String(p.categoryId),
   category: cat?.category ?? "",
   brand: p.brand,
-  buyPrice: p.buyPrice,
+  buyPrice: p.buyPrice ?? null,
   sellPrice: p.sellPrice,
   stock: p.stock,
 });

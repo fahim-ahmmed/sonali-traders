@@ -26,7 +26,7 @@ export async function approveSale(sale, approverId, session) {
       sale.items.map((it) => ({ productId: it.productId, date: sale.date, type: "sale", qty: -it.qty, refId: sale._id, note: sale.invoiceNo })),
       { session }
     );
-    const cats = [...new Set(sale.items.map((i) => i.category).filter(Boolean))];
+    const cats = [...new Set(sale.items.map((i) => i.category?.toLowerCase()).filter(Boolean))];
     if (cats.length) await Customer.updateOne({ _id: sale.customerId }, { $addToSet: { tags: { $each: cats } } }, { session });
   }
 

@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "seed": "node scripts/seed.js",
+    "seed:products": "node scripts/seed-products.js",
     "seed:staff": "node scripts/seed-staff.js",
     "import:customers": "node scripts/import-customers.js"
   },

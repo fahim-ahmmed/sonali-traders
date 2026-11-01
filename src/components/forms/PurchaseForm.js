@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Package, Plus, Tag, Trash2 } from "lucide-react";
@@ -7,16 +7,16 @@ import Button from "@/components/ui/Button";
 import Input, { Select } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Feedback";
 import { useToast } from "@/components/ui/Toast";
+import ProductSelect from "@/components/shared/ProductSelect";
 import { dhakaDateKey } from "@/lib/dates";
 import { formatMoney, toPaisa, toTaka } from "@/lib/money";
 
-const blank = () => ({ productId: "", qty: "", price: "" });
+const blank = () => ({ productId: "", product: null, qty: "", price: "" });
 
 export default function PurchaseForm({ purchaseId }) {
   const router = useRouter();
   const { toast } = useToast();
   const [suppliers, setSuppliers] = useState(null);
-  const [products, setProducts] = useState(null);
   const [loaded, setLoaded] = useState(!purchaseId);
   const [f, setF] = useState({ supplierId: "", date: dhakaDateKey(), stockControl: "yes", paid: "" });
   const [lines, setLines] = useState([blank()]);
@@ -25,7 +25,6 @@ export default function PurchaseForm({ purchaseId }) {
 
   useEffect(() => {
     fetch("/api/suppliers?limit=200").then((r) => r.json()).then((j) => j.ok ? setSuppliers(j.data.items) : toast(j.error, "error"));
-    fetch("/api/products?limit=100").then((r) => r.json()).then((j) => j.ok ? setProducts(j.data.items) : toast(j.error, "error"));
   }, [toast]);
 
   useEffect(() => {
@@ -34,20 +33,23 @@ export default function PurchaseForm({ purchaseId }) {
       if (!j.ok) { toast(j.error, "error"); return router.replace("/purchases"); }
       const p = j.data;
       setF({ supplierId: p.supplierId, date: p.dateKey, stockControl: p.stockControl ? "yes" : "no", paid: p.paidAmount === p.grandTotal ? "" : String(toTaka(p.paidAmount)) });
-      setLines(p.items.map((i) => ({ productId: i.productId, qty: String(i.qty), price: String(toTaka(i.buyPrice)) })));
+      setLines(p.items.map((i) => ({
+        productId: i.productId,
+        product: { id: i.productId, name: i.name, category: i.category, brand: i.brand, buyPrice: i.buyPrice, stock: 0, sellPrice: 0 },
+        qty: String(i.qty),
+        price: String(toTaka(i.buyPrice)),
+      })));
       setLoaded(true);
     });
   }, [purchaseId, router, toast]);
 
-  const pmap = useMemo(() => new Map((products || []).map((p) => [p.id, p])), [products]);
   const lineTotal = (l) => Math.round((Number(l.qty) || 0) * toPaisa(l.price));
   const grand = lines.reduce((s, l) => s + lineTotal(l), 0);
 
   const setLine = (i, patch) => setLines(lines.map((l, k) => (k === i ? { ...l, ...patch } : l)));
-  function pickProduct(i, id) {
-    const p = pmap.get(id);
+  function pickProduct(i, p) {
     // দাম ফাঁকা থাকলে শেষ ক্রয়দর বসে
-    setLine(i, { productId: id, price: lines[i].price || (p?.buyPrice ? String(toTaka(p.buyPrice)) : "") });
+    setLine(i, { productId: p.id, product: p, price: lines[i].price || (p?.buyPrice ? String(toTaka(p.buyPrice)) : "") });
   }
 
   function validate() {
@@ -83,7 +85,7 @@ export default function PurchaseForm({ purchaseId }) {
     router.push("/purchases"); router.refresh();
   }
 
-  if (!suppliers || !products || !loaded) return <div className="space-y-4"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-32" /></div>;
+  if (!suppliers || !loaded) return <div className="space-y-4"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-32" /></div>;
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
@@ -117,15 +119,12 @@ export default function PurchaseForm({ purchaseId }) {
         </div>
         <div className="divide-y divide-slate-100">
           {lines.map((l, i) => {
-            const p = pmap.get(l.productId);
+            const p = l.product;
             const err = errors.lines?.[i];
             return (
               <div key={i} className={`p-4 transition-colors ${err ? "bg-rose-50/40" : ""}`}>
                 <div className="grid items-end gap-3 sm:grid-cols-[2fr_1fr_1fr_1fr_40px]">
-                  <Select label="Product" value={l.productId} onChange={(e) => pickProduct(i, e.target.value)}>
-                    <option value="">Select product</option>
-                    {products.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.brand})</option>)}
-                  </Select>
+                  <ProductSelect value={l.productId} selectedProduct={l.product} onSelect={(product) => pickProduct(i, product)} error={!l.productId ? err : ""} />
                   <Input label="Quantity" type="number" min="0" step="any" inputMode="decimal" value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value })} />
                   <Input label="Buying price" type="number" min="0" step="0.01" inputMode="decimal" value={l.price} onChange={(e) => setLine(i, { price: e.target.value })} />
                   <div>

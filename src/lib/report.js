@@ -22,7 +22,11 @@ export async function buildReport(from, to) {
 
   let cement = 0, rod = 0;
   const salesRows = sales.map((s) => {
-    for (const i of s.items) { if (i.category === "cement") cement += i.qty; else if (i.category === "rod") rod += i.qty; }
+    for (const i of s.items) {
+      const category = String(i.category || "").toUpperCase();
+      if (category === "CEMENT") cement += i.qty;
+      else if (category === "ROD") rod += i.qty;
+    }
     return {
       id: String(s._id), invoiceNo: s.invoiceNo, date: s.date, customer: s.customerId?.name || "—",
       product: s.items.length ? s.items.map((i) => `${i.name} × ${i.qty}`).join(", ") : "Collection",

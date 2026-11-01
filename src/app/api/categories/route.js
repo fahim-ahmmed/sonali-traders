@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { connectDB } from "@/lib/db";
-import { ok, fail, requireUser } from "@/lib/api";
+import { ok, fail, requireAny, requireUser } from "@/lib/api";
 import Category from "@/models/Category";
 
 const schema = z.object({
@@ -11,8 +11,7 @@ const schema = z.object({
 const dto = (c) => ({ id: String(c._id), category: c.category, brand: c.brand });
 
 export async function GET() {
-  // POS/Purchase ফর্মও এটি ব্যবহার করবে, তাই যেকোনো লগইন ইউজার
-  const { error } = await requireUser();
+  const { error } = await requireAny(["product", "pos", "purchase"]);
   if (error) return error;
   await connectDB();
   const items = await Category.find().sort({ category: 1, brand: 1 }).lean();

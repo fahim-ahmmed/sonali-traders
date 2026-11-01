@@ -1,12 +1,11 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, ChevronDown, Info, Loader2, PackageOpen, Plus, Trash2, UserPlus, UserRound } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input, { Textarea } from "@/components/ui/Input";
-import Combobox from "@/components/ui/Combobox";
+import ProductSelect from "@/components/shared/ProductSelect";
 import Modal from "@/components/ui/Modal";
-import { Skeleton } from "@/components/ui/Feedback";
 import { useToast } from "@/components/ui/Toast";
 import CustomerPicker from "@/components/forms/CustomerPicker";
 import { dhakaDateKey } from "@/lib/dates";
@@ -14,11 +13,10 @@ import { formatMoney, toPaisa, toTaka } from "@/lib/money";
 
 const newRef = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 let seq = 0;
-const blank = () => ({ key: ++seq, productId: "", qty: "", rate: "" });
+const blank = () => ({ key: ++seq, productId: "", product: null, qty: "", rate: "" });
 
 export default function PosScreen({ isAdmin }) {
   const { toast } = useToast();
-  const [products, setProducts] = useState(null);
   const [customer, setCustomer] = useState(null);
   const [date, setDate] = useState(dhakaDateKey());
   const [lines, setLines] = useState([blank()]);
@@ -33,13 +31,6 @@ export default function PosScreen({ isAdmin }) {
   const clientRef = useRef(newRef());
   const root = useRef(null);
 
-  useEffect(() => {
-    fetch("/api/products?limit=100").then((r) => r.json()).then((j) => j.ok ? setProducts(j.data.items) : toast(j.error, "error"));
-  }, [toast]);
-
-  const pmap = useMemo(() => new Map((products || []).map((p) => [p.id, p])), [products]);
-  const options = useMemo(() => (products || []).map((p) => ({ value: p.id, label: p.name, sub: `${p.brand} · ${formatMoney(p.sellPrice)}` })), [products]);
-
   // ---- Sale Summary সূত্র (মাস্টার প্ল্যান ৮.২) ----
   const lineTotal = (l) => Math.round((Number(l.qty) || 0) * toPaisa(l.rate));
   const total = lines.reduce((s, l) => s + lineTotal(l), 0);
@@ -53,9 +44,8 @@ export default function PosScreen({ isAdmin }) {
   const setLine = (i, patch) => setLines((ls) => ls.map((l, k) => (k === i ? { ...l, ...patch } : l)));
   const focusField = (i, field) => setTimeout(() => root.current?.querySelector(`[data-line="${i}"][data-field="${field}"]`)?.focus(), 30);
 
-  function pickProduct(i, o) {
-    const p = pmap.get(o.value);
-    setLine(i, { productId: o.value, rate: String(toTaka(p.sellPrice)) });
+  function pickProduct(i, p) {
+    setLine(i, { productId: p.id, product: p, rate: String(toTaka(p.sellPrice)) });
   }
   function nextLine(i) {
     if (i === lines.length - 1) setLines((ls) => [...ls, blank()]);
@@ -99,7 +89,6 @@ export default function PosScreen({ isAdmin }) {
     clientRef.current = newRef();
     setCustomer(null); setLines([blank()]); setPaid(""); setRemarks(""); setTrack(""); setErrors({}); setDone(null); setMore(false);
     setDate(dhakaDateKey());
-    fetch("/api/products?limit=100").then((r) => r.json()).then((j) => j.ok && setProducts(j.data.items)); // স্টক রিফ্রেশ
   }
 
   if (done) {
@@ -123,15 +112,6 @@ export default function PosScreen({ isAdmin }) {
             )}
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (!products) {
-    return (
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="space-y-6 lg:col-span-8"><Skeleton className="h-36 rounded-2xl" /><Skeleton className="h-64 rounded-2xl" /></div>
-        <Skeleton className="h-96 rounded-2xl lg:col-span-4" />
       </div>
     );
   }
@@ -194,7 +174,7 @@ export default function PosScreen({ isAdmin }) {
           </div>
           <div className="divide-y divide-slate-100">
             {lines.map((l, i) => {
-              const p = pmap.get(l.productId);
+              const p = l.product;
               const err = errors.lines?.[l.key];
               const short = p && Number(l.qty) > p.stock;
               return (
@@ -202,8 +182,8 @@ export default function PosScreen({ isAdmin }) {
                   <div className="grid items-center gap-3 sm:grid-cols-[2fr_1fr_1fr_1fr_40px]">
                     <div>
                       <span className="field-label sm:hidden">Product</span>
-                      <Combobox options={options} value={l.productId} placeholder="Search product" data-line={i} data-field="product" aria-label="Product"
-                        onSelect={(o) => pickProduct(i, o)} onAfterSelect={() => focusField(i, "qty")} />
+                      <ProductSelect label="" value={l.productId} selectedProduct={l.product} placeholder="Search product" inputProps={{ "data-line": i, "data-field": "product", "aria-label": "Product" }}
+                        onSelect={(product) => { pickProduct(i, product); focusField(i, "qty"); }} />
                     </div>
                     <div>
                       <span className="field-label sm:hidden">Quantity</span>

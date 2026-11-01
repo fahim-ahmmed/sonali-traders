@@ -11,6 +11,7 @@ POS, ইনভেন্টরি, কাস্টমার-বাকি লে�
 npm install
 cp .env.example .env.local     # ফাইলটি ভরুন (নিচে দেখুন)
 npm run seed                   # Admin, সেটিংস, ৯টি Category-Brand, ৮টি প্রোডাক্ট, Subscription
+npm run seed:products          # শুধু catalog seed / verify (idempotent)
 npm run dev                    # http://localhost:3000
 ```
 
@@ -23,6 +24,17 @@ npm run dev                    # http://localhost:3000
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
 | `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL` | লোকালে `http://localhost:3000`, প্রোডাকশনে আসল ডোমেইন |
 | `SEED_ADMIN_*` | প্রথম Admin-এর ইমেইল/পাসওয়ার্ড/নাম |
+
+### Product ও Category data
+
+- Category/brand-এর একমাত্র উৎস MongoDB `Category`; product-এর একমাত্র উৎস MongoDB `Product`।
+- `npm run seed:products` exact catalog-এর category-brand pairs/products `$setOnInsert` দিয়ে যোগ করে, archived product ফের সক্রিয় করে না, এবং expected count/total যাচাই করে।
+- Product List, Add/Edit Product এবং Add Category list `GET /api/products` ও `GET /api/categories` ব্যবহার করে।
+- POS (`PosScreen`) ও Purchase (`PurchaseForm`) active product lookup-এর জন্য `GET /api/products?q=&categoryId=&active=1` এবং shared `src/components/shared/ProductSelect.jsx` ব্যবহার করে।
+- Approval-এর existing sale rows-এ সংরক্ষিত item snapshot ব্যবহার হবে; নতুন product dropdown লাগলে একই lookup/selector ব্যবহার করুন।
+- Reports ও Dashboard sales/purchase item-এর category snapshot ব্যবহার করে Cement/Rod quantity গুনবে; lookup API-এর বর্তমান product name দিয়ে পুরনো invoice পুনর্লিখবে না।
+- Sidebar শুধু `/products` ও Category পেজে নেভিগেট করে; কোনো catalog data embed করে না।
+- Product deletion soft archive (`active=false`); Category/brand ব্যবহৃত product থাকলে delete API প্রত্যাখ্যান করে।
 
 > **গুরুত্বপূর্ণ:** MongoDB-কে **replica set** হতে হবে (Atlas-এ আছে)। লোকাল standalone `mongod`-এ transaction চলে না।
 > পাসওয়ার্ড/ক্রেডেনশিয়াল কোডে বা এই ডকুমেন্টে রাখবেন না — শুধু `.env`।

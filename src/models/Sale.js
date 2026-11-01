@@ -4,7 +4,8 @@ const ItemSchema = new mongoose.Schema(
   {
     productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
     name: String,            // নামের snapshot
-    category: String,        // "cement" | "rod" (কাস্টমার ট্যাগের জন্য)
+    category: String,        // category snapshot
+    brand: String,           // brand snapshot
     qty: { type: Number, required: true },
     rate: { type: Number, required: true },        // পয়সা
     costSnapshot: { type: Number, default: 0 },    // approve-এর সময় product.buyPrice (D3)

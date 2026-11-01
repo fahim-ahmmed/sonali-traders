@@ -55,7 +55,7 @@ export default function ProductForm({ productId }) {
     const res = await fetch(productId ? `/api/products/${productId}` : "/api/products", {
       method: productId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: f.name, categoryId: f.categoryId, buyPrice: toPaisa(f.buy), sellPrice: toPaisa(f.sell) }),
+      body: JSON.stringify({ name: f.name, categoryId: f.categoryId, buyPrice: f.buy === "" ? null : toPaisa(f.buy), sellPrice: toPaisa(f.sell) }),
     }).then((r) => r.json());
     if (!res.ok) { toast(res.error, "error"); setSaving(false); return; }
     toast(productId ? "Product updated" : "Product saved");

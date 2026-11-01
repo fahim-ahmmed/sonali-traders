@@ -8,12 +8,21 @@ export async function buildPurchase(data, session) {
   const supplier = await Supplier.findById(data.supplierId).session(session);
   if (!supplier || !supplier.active) throw new AppError("Supplier not found", 422);
   const ids = [...new Set(data.items.map((i) => i.productId))];
-  const products = await Product.find({ _id: { $in: ids }, active: true }).session(session);
+  const products = await Product.find({ _id: { $in: ids }, active: true }).populate("categoryId", "category brand").session(session);
   const map = new Map(products.map((p) => [String(p._id), p]));
   const items = data.items.map((i) => {
     const p = map.get(i.productId);
     if (!p) throw new AppError("A selected product no longer exists", 422);
-    return { productId: p._id, name: p.name, qty: i.qty, buyPrice: i.buyPrice, lineTotal: Math.round(i.qty * i.buyPrice) };
+    return {
+      productId: p._id,
+      name: p.name,
+      category: p.categoryId?.category || "",
+      brand: p.categoryId?.brand || p.brand,
+      qty: i.qty,
+      rate: i.buyPrice,
+      buyPrice: i.buyPrice,
+      lineTotal: Math.round(i.qty * i.buyPrice),
+    };
   });
   const grandTotal = items.reduce((s, i) => s + i.lineTotal, 0);
   const paidAmount = data.paidAmount == null ? grandTotal : Math.min(data.paidAmount, grandTotal);
