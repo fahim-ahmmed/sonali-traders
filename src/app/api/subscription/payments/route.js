@@ -1,7 +1,8 @@
 import { connectDB } from "@/lib/db";
 import { fail, ok, requireUser } from "@/lib/api";
 import { paymentPageSchema, subscriptionPaymentSchema } from "@/lib/subscription-payment-schema";
-import { subscriptionStatus } from "@/lib/subscription";
+import { nextSubscriptionCycle, subscriptionStatus } from "@/lib/subscription";
+import { AppError, handleError, withTx } from "@/lib/tx";
 import Subscription from "@/models/Subscription";
 import SubscriptionPayment from "@/models/SubscriptionPayment";
 
@@ -62,26 +63,43 @@ export async function POST(request) {
   const parsed = subscriptionPaymentSchema.safeParse(body);
   if (!parsed.success) return fail(parsed.error.issues[0].message, 422);
 
-  await connectDB();
-  const subscription = await Subscription.findOne({ key: "main" }).select("monthlyFee").lean();
-  if (!subscription) return fail("Subscription details have not been set up yet", 409);
-  if (!Number.isSafeInteger(subscription.monthlyFee) || subscription.monthlyFee <= 0) {
-    return fail("Subscription fee is not configured correctly", 409);
-  }
-
   const details = parsed.data;
   try {
-    const payment = await SubscriptionPayment.create({
-      ...details,
-      amount: subscription.monthlyFee,
-      status: "pending",
-      submittedBy: String(user.id),
-      submittedByName: user.name || "",
-      submittedAt: new Date(),
+    const result = await withTx(async (session) => {
+      const subscription = await Subscription.findOne({ key: "main" }).session(session);
+      if (!subscription) throw new AppError("Subscription details have not been set up yet", 409);
+      if (!Number.isSafeInteger(subscription.monthlyFee) || subscription.monthlyFee <= 0) {
+        throw new AppError("Subscription fee is not configured correctly", 409);
+      }
+
+      const cycle = nextSubscriptionCycle(subscription.validUntil);
+      subscription.validUntil = cycle.validUntil;
+      subscription.nextPaymentDate = cycle.nextPaymentDate;
+      subscription.status = "active";
+      await subscription.save({ session });
+
+      const [payment] = await SubscriptionPayment.create([{
+        ...details,
+        amount: subscription.monthlyFee,
+        status: "APPROVED",
+        submittedBy: String(user.id),
+        submittedByName: user.name || "",
+        submittedAt: new Date(),
+      }], { session });
+
+      return {
+        payment: paymentDto(payment),
+        subscription: {
+          monthlyFee: subscription.monthlyFee,
+          validUntil: subscription.validUntil,
+          nextPaymentDate: subscription.nextPaymentDate,
+          ...subscriptionStatus(subscription),
+        },
+      };
     });
-    return ok(paymentDto(payment), 201);
+    return ok(result, 201);
   } catch (e) {
     if (e?.code === 11000) return fail("This transaction ID has already been submitted for this payment method", 409);
-    throw e;
+    return handleError(e);
   }
 }

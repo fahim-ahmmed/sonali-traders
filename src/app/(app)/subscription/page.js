@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight, BadgeCheck, Banknote, CalendarCheck, CalendarClock, Check, ChevronLeft,
   ChevronRight, CircleHelp, Clock3, Copy, CreditCard, LoaderCircle, ReceiptText,
@@ -10,6 +11,7 @@ import PageHeader from "@/components/layout/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { formatDate } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
+import { nextSubscriptionCycle } from "@/lib/subscription";
 
 const PAYMENT_NUMBER = "01305470835";
 
@@ -78,6 +80,7 @@ function LoadingRows() {
 
 export default function SubscriptionPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const [data, setData] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -130,6 +133,32 @@ export default function SubscriptionPage() {
     setFormErrors(errors);
     if (Object.keys(errors).length) return;
 
+    const previousData = data;
+    const cycle = nextSubscriptionCycle(subscription?.validUntil);
+    const optimisticPayment = {
+      id: `optimistic-${Date.now()}`,
+      method,
+      senderNumber,
+      transactionId,
+      amount: subscription.monthlyFee,
+      status: "APPROVED",
+      submittedAt: new Date().toISOString(),
+    };
+    const optimisticDays = Math.ceil((cycle.validUntil.getTime() + 86400000 - Date.now()) / 86400000);
+    setData((current) => ({
+      ...current,
+      subscription: {
+        ...current.subscription,
+        ...cycle,
+        state: optimisticDays <= 0 ? "expired" : optimisticDays <= 7 ? "expiring" : "active",
+        days: optimisticDays,
+      },
+      payments: [optimisticPayment, ...current.payments].slice(0, 10),
+      total: current.total + 1,
+      page: 1,
+      pages: Math.max(1, Math.ceil((current.total + 1) / 10)),
+    }));
+    setPage(1);
     setSubmitting(true);
     try {
       const response = await fetch("/api/subscription/payments", {
@@ -139,13 +168,19 @@ export default function SubscriptionPage() {
       });
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.error || "Could not submit payment verification.");
+      setData((current) => ({
+        ...current,
+        subscription: result.data.subscription,
+        payments: [result.data.payment, ...current.payments.filter((payment) => payment.id !== optimisticPayment.id)].slice(0, 10),
+      }));
       setSenderNumber("");
       setTransactionId("");
       setNote("");
       setFormErrors({});
-      toast("Payment submitted. It is now pending verification.", "success");
-      await loadPage(1);
+      toast("Payment approved. Your subscription has been renewed.", "success");
+      router.refresh();
     } catch (error) {
+      setData(previousData);
       toast(error instanceof Error ? error.message : "Could not submit payment verification.", "error");
     } finally {
       setSubmitting(false);
@@ -256,7 +291,7 @@ export default function SubscriptionPage() {
               </ol>
               <div className="mt-6 flex gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/70 p-3.5 text-xs leading-5 text-amber-900">
                 <CircleHelp className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <p>Keep your transaction ID. Your submission will remain pending until it is reviewed.</p>
+                <p>Keep your transaction ID for your records. Submitting the payment details renews your plan immediately.</p>
               </div>
             </article>
 
@@ -372,7 +407,7 @@ export default function SubscriptionPage() {
                 </button>
                 <p className="flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-500">
                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
-                  TrxID submissions are reviewed before your subscription is updated.
+                  Submission is available to the signed-in administrator only.
                 </p>
               </form>
             </article>

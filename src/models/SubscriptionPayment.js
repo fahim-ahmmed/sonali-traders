@@ -7,7 +7,7 @@ const SubscriptionPaymentSchema = new mongoose.Schema(
     transactionId: { type: String, required: true, uppercase: true, trim: true },
     amount: { type: Number, required: true, min: 1 }, // পয়সা; server-side subscription fee snapshot
     note: { type: String, default: "", maxlength: 300 },
-    status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending", required: true },
+    status: { type: String, enum: ["pending", "approved", "rejected", "PENDING", "APPROVED", "REJECTED"], default: "pending", required: true },
     submittedBy: { type: String, required: true },
     submittedByName: { type: String, default: "" },
     submittedAt: { type: Date, default: Date.now, required: true },

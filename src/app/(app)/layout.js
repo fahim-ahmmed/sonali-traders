@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { connectDB } from "@/lib/db";
-import { subscriptionStatus } from "@/lib/subscription";
+import { subscriptionReminder } from "@/lib/subscription";
 import Settings from "@/models/Settings";
 import Sale from "@/models/Sale";
 import Subscription from "@/models/Subscription";
@@ -23,16 +23,17 @@ export default async function AppLayout({ children }) {
   ]);
   const company = { companyName: s?.companyName || "Sonali Trading", logoUrl: s?.logoUrl || "" };
   const user = { name: session.user.name, role: session.user.role, permissions: session.user.permissions, active: session.user.active };
-  const st = subscriptionStatus(sub);
+  const reminder = isAdmin ? subscriptionReminder(sub) : { show: false };
 
   return (
     <div className="min-h-screen bg-canvas">
       <Suspense fallback={null}><Sidebar user={user} company={company} pending={pending} /></Suspense>
       <div className="md:pl-64 print:pl-0">
-        {isAdmin && (st.state === "expiring" || st.state === "expired") && (
-          <div role="alert" className={`no-print flex items-center justify-center gap-2 px-5 py-2 text-center text-xs font-semibold ${st.state === "expired" ? "bg-danger text-white" : "bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-600/20"}`}>
-            {st.state === "expired" ? "Your subscription has expired." : `Your subscription ends in ${st.days} day${st.days === 1 ? "" : "s"}.`}
-            <Link href="/subscription" className="rounded-full bg-white/20 px-2 py-0.5 underline-offset-2 hover:underline">View details →</Link>
+        {reminder.show && (
+          <div role="alert" className="no-print sticky top-0 z-30 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 bg-amber-50 px-5 py-2.5 text-center text-xs font-semibold text-amber-900 ring-1 ring-inset ring-amber-600/20">
+            <span aria-hidden="true">⚠️</span>
+            <span>Reminder: Your monthly subscription payment is due by the 9th. Please renew to keep your workspace active.</span>
+            <Link href="/subscription" className="rounded-full bg-amber-100 px-2.5 py-1 font-bold underline-offset-2 hover:bg-amber-200 hover:underline">Pay Now</Link>
           </div>
         )}
         {children}
