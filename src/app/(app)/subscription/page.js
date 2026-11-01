@@ -20,12 +20,19 @@ export default function SubscriptionPage() {
   return (
     <>
       <PageHeader group="Subscription" title="Software subscription" />
-      <main className="p-5 sm:p-8">
-        <div className="card max-w-xl p-6">
-          <h2 className="text-lg font-bold text-navy-900">Subscription</h2>
-          <p className={`mb-4 mt-1 rounded-lg px-3 py-2 text-sm ${state === "expired" ? "bg-red-50 text-danger" : state === "expiring" ? "bg-amber-50 text-amber-800" : "bg-slate-50 text-slate-600"}`}>{MSG[state]}</p>
-          {sub === undefined ? <Skeleton className="h-48" /> : <SubscriptionCard sub={sub} />}
-          <p className="mt-4 text-xs text-slate-400">Developed by Bengal Tech Hub Solution. Plan changes are handled by the developer.</p>
+      <main className="page">
+        <div className="card max-w-xl overflow-hidden">
+          <div className="card-header">
+            <div>
+              <h2 className="card-title text-base">Subscription</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Your software plan and payment schedule</p>
+            </div>
+          </div>
+          <div className="p-5">
+            <p className={`mb-4 rounded-xl px-4 py-3 text-sm ring-1 ring-inset ${state === "expired" ? "bg-rose-50 text-rose-700 ring-rose-600/20" : state === "expiring" ? "bg-amber-50 text-amber-800 ring-amber-600/20" : "bg-slate-50 text-slate-600 ring-slate-500/10"}`}>{MSG[state]}</p>
+            {sub === undefined ? <Skeleton className="h-56" /> : <SubscriptionCard sub={sub} />}
+            <p className="mt-5 text-xs text-slate-400">Developed by Bengal Tech Hub Solution. Plan changes are handled by the developer.</p>
+          </div>
         </div>
       </main>
     </>

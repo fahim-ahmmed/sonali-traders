@@ -1,4 +1,4 @@
-import { CalendarCheck, CalendarClock, CircleCheck, Wallet } from "lucide-react";
+import { CalendarCheck, CalendarClock, Wallet } from "lucide-react";
 import { connectDB } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { formatDate } from "@/lib/dates";
@@ -9,13 +9,6 @@ import LoginForm from "@/components/auth/LoginForm";
 
 export const metadata = { title: "Sign in · Sonali Trading" };
 export const dynamic = "force-dynamic"; // বিল্ডের সময় DB-তে না গিয়ে প্রতি রিকোয়েস্টে লাইভ সাবস্ক্রিপশন
-
-const FEATURES = [
-  "Point of sale with instant invoicing",
-  "Live stock & purchase tracking",
-  "Customer due & advance ledger",
-  "Daily and monthly profit reports",
-];
 
 const BADGE = {
   active: { label: "Active", cls: "border-success/30 bg-success/15 text-emerald-300" },
@@ -90,44 +83,41 @@ export default async function LoginPage() {
           </header>
 
           <div className="max-w-lg py-12">
-            <h1 className="text-4xl font-bold leading-tight tracking-tight xl:text-5xl">
-              Manage Your Trading Operations with{" "}
-              <span className="bg-gradient-to-r from-gold-500 to-amber-300 bg-clip-text text-transparent">Precision.</span>
-            </h1>
-            <p className="mt-4 text-base leading-relaxed text-slate-300">
-              Sales, stock, customer balances and profit — one secure workspace for your whole business.
+            <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.2em] text-gold-500">
+              <span className="h-px w-6 bg-gold-500" aria-hidden />
+              Subscription Overview
             </p>
-            <ul className="mt-8 space-y-3">
-              {FEATURES.map((f) => (
-                <li key={f} className="flex items-center gap-3 text-sm text-slate-200">
-                  <CircleCheck className="h-5 w-5 shrink-0 text-gold-500" aria-hidden />
-                  {f}
-                </li>
-              ))}
-            </ul>
+            <h1 className="mt-4 text-5xl font-bold leading-[1.05] tracking-tight xl:text-6xl">
+              Stay in{" "}
+              <span className="bg-gradient-to-r from-gold-500 to-amber-300 bg-clip-text text-transparent">control.</span>
+            </h1>
+            <p className="mt-5 max-w-md text-base leading-relaxed text-slate-300">
+              Secure access to your material management workspace, all in one place.
+            </p>
           </div>
 
           {plan ? (
-            <div className="max-w-lg rounded-2xl border border-white/10 bg-white/[.06] p-5 shadow-2xl shadow-black/20 backdrop-blur-md">
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Subscription</p>
-                {plan.badge && (
+            <div className="max-w-2xl">
+              {plan.badge && (
+                <div className="mb-3 flex items-center gap-2 text-xs text-slate-400">
+                  Plan status
                   <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${plan.badge.cls}`}>{plan.badge.label}</span>
-                )}
-              </div>
-              <dl className="grid grid-cols-3 gap-4">
-                <div>
-                  <dt className="flex items-center gap-1.5 text-xs text-slate-400"><Wallet className="h-3.5 w-3.5" aria-hidden />Monthly Fee</dt>
-                  <dd className="mt-1 text-base font-semibold tabular-nums">{plan.fee}</dd>
                 </div>
-                <div>
-                  <dt className="flex items-center gap-1.5 text-xs text-slate-400"><CalendarCheck className="h-3.5 w-3.5" aria-hidden />Valid Until</dt>
-                  <dd className="mt-1 text-base font-semibold">{plan.validUntil}</dd>
-                </div>
-                <div>
-                  <dt className="flex items-center gap-1.5 text-xs text-slate-400"><CalendarClock className="h-3.5 w-3.5" aria-hidden />Next Payment</dt>
-                  <dd className="mt-1 text-base font-semibold">{plan.nextPayment}</dd>
-                </div>
+              )}
+              <dl className="grid grid-cols-3 gap-3">
+                {[
+                  { label: "Monthly Fees", value: plan.fee, icon: Wallet, num: true },
+                  { label: "Valid Until", value: plan.validUntil, icon: CalendarCheck },
+                  { label: "Next Payment Date", value: plan.nextPayment, icon: CalendarClock },
+                ].map(({ label, value, icon: Icon, num }) => (
+                  <div key={label} className="rounded-xl border border-white/15 bg-white/5 p-4 shadow-xl shadow-black/10 backdrop-blur-md transition-colors hover:bg-white/[.08]">
+                    <dt className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      <Icon className="h-3.5 w-3.5 text-gold-500" aria-hidden />
+                      {label}
+                    </dt>
+                    <dd className={`mt-2 text-lg font-semibold text-white ${num ? "num" : ""}`}>{value}</dd>
+                  </div>
+                ))}
               </dl>
             </div>
           ) : <div />}
