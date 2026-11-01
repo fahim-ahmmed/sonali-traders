@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Boxes, CalendarRange, Hammer, Printer, ReceiptText, RefreshCw, ShoppingBasket, TrendingUp, Wallet } from "lucide-react";
+import { Boxes, CalendarRange, Coins, Hammer, Printer, ReceiptText, RefreshCw, ShoppingBasket, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
 import PrintHeader from "@/components/layout/PrintHeader";
 import Button from "@/components/ui/Button";
@@ -39,6 +39,10 @@ export default function ReportScreen({ kind }) {
   const label = d ? (d.from === d.to ? formatDate(`${d.from}T00:00:00+06:00`, { weekday: "long", day: "2-digit", month: "long", year: "numeric" }) : `${formatDate(`${d.from}T00:00:00+06:00`)} – ${formatDate(`${d.to}T00:00:00+06:00`)}`) : "";
   const cards = t && [
     { l: "Total Sale", v: formatMoney(t.sale), icon: TrendingUp, grad: "from-sky-500 to-blue-600" },
+    { l: "Total Cost", v: formatMoney(t.cost), icon: Coins, grad: "from-slate-500 to-slate-700" },
+    { l: t.profit >= 0 ? "Total Profit" : "Total Loss", v: formatMoney(Math.abs(t.profit)), icon: t.profit >= 0 ? TrendingUp : TrendingDown, grad: t.profit >= 0 ? "from-emerald-500 to-green-600" : "from-rose-500 to-red-600" },
+    { l: t.netProfit >= 0 ? "Net Profit" : "Net Loss", v: formatMoney(Math.abs(t.netProfit)), icon: t.netProfit >= 0 ? TrendingUp : TrendingDown, grad: t.netProfit >= 0 ? "from-emerald-500 to-green-600" : "from-rose-500 to-red-600" },
+    { l: "Sales Due", v: formatMoney(t.due), icon: ReceiptText, grad: "from-rose-500 to-red-600" },
     { l: "Total Purchase", v: formatMoney(t.purchase), icon: ShoppingBasket, grad: "from-emerald-500 to-green-600" },
     { l: "Cement Quantity", v: `${t.cementQty} PCS`, icon: Boxes, grad: "from-violet-500 to-purple-700" },
     { l: "Rod Quantity", v: `${t.rodQty} PCS`, icon: Hammer, grad: "from-blue-500 to-indigo-600" },
@@ -66,12 +70,12 @@ export default function ReportScreen({ kind }) {
           </div>
         </section>
 
-        {!d ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div> : (
+        {!d ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">{[...Array(9)].map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div> : (
           <>
             <p className="flex items-center gap-2 text-sm font-semibold text-slate-600">
               <span className="h-1.5 w-1.5 rounded-full bg-gold-500" aria-hidden /> Report for <span className="text-navy-900">{label}</span>
             </p>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
               {cards.map(({ l, v, icon: Icon, grad }) => (
                 <div key={l} className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${grad} p-4 text-white shadow-lg shadow-navy-900/10`}>
                   <span className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/10" aria-hidden />
@@ -91,27 +95,33 @@ export default function ReportScreen({ kind }) {
               </div>
               {!d.sales.length && !d.opening.length ? <EmptyState icon={TrendingUp} title="No sales found for this period" /> : (
                 <div className="table-wrap print-expand max-h-[60vh]">
-                  <table className="w-full min-w-[820px]">
-                    <thead><tr><th className="th">Date</th><th className="th">Customer</th><th className="th">Product</th><th className="th text-right">Quantity</th><th className="th text-right">Total</th><th className="th text-right">Paid</th><th className="th text-right">Due</th></tr></thead>
+                  <table className="w-full min-w-[1040px]">
+                    <thead><tr><th className="th">Invoice</th><th className="th">Date</th><th className="th">Customer</th><th className="th">Product</th><th className="th text-right">Quantity</th><th className="th text-right">Total</th><th className="th text-right">Cost</th><th className="th text-right">Profit</th><th className="th text-right">Paid</th><th className="th text-right">Due</th></tr></thead>
                     <tbody className="rows">
                       {d.sales.map((s) => (
                         <tr key={s.id}>
+                          <td className="td"><span className="badge badge-info num">{s.invoiceNo || "—"}</span></td>
                           <td className="td num whitespace-nowrap text-slate-500">{formatDate(s.date)}</td>
                           <td className="td font-semibold text-navy-900">{s.customer}</td>
                           <td className="td">{s.product}</td>
                           <td className="td num text-right">{s.qty ? `${s.qty} pcs` : "—"}</td>
                           <td className="td num text-right font-medium text-navy-900">{formatMoney(s.total)}</td>
+                          <td className="td num text-right text-slate-500">{formatMoney(s.cost)}</td>
+                          <td className={`td num text-right font-semibold ${s.profit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatMoney(s.profit)}</td>
                           <td className="td num text-right text-emerald-600">{formatMoney(s.paid)}</td>
                           <td className={`td num text-right font-semibold ${s.due > 0 ? "text-rose-600" : "text-slate-400"}`}>{formatMoney(s.due)}</td>
                         </tr>
                       ))}
                       {d.opening.map((o) => (
                         <tr key={o.id} className="bg-amber-50/40 text-slate-500">
+                          <td className="td">—</td>
                           <td className="td num whitespace-nowrap">{formatDate(o.date)}</td>
                           <td className="td font-semibold text-slate-700">{o.customer}</td>
                           <td className="td"><span className="badge badge-warning">Opening Due</span> <span className="text-[11px]">(not counted in sales)</span></td>
                           <td className="td text-right">1 entry</td>
                           <td className="td num text-right">{formatMoney(o.amount)}</td>
+                          <td className="td num text-right">{formatMoney(0)}</td>
+                          <td className="td num text-right">{formatMoney(0)}</td>
                           <td className="td num text-right">{formatMoney(0)}</td>
                           <td className="td num text-right text-rose-600">{formatMoney(o.amount)}</td>
                         </tr>

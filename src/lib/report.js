@@ -8,6 +8,7 @@ import Customer from "@/models/Customer";
 const KEY = /^\d{4}-\d{2}-\d{2}$/;
 export const validKey = (k) => KEY.test(k || "") && !isNaN(new Date(`${k}T00:00:00+06:00`));
 export const rangeOf = (from, to) => ({ $gte: dhakaDayRange(from).start, $lt: dhakaDayRange(to).end });
+const saleCost = (sale) => sale.costTotal ?? sale.items.reduce((total, item) => total + Math.round(item.qty * item.costSnapshot), 0);
 
 // শুধু approved বিক্রি গণনায়; Opening Due আলাদা (Sales মোটে বাদ)
 export async function buildReport(from, to) {
@@ -22,24 +23,33 @@ export async function buildReport(from, to) {
 
   let cement = 0, rod = 0;
   const salesRows = sales.map((s) => {
+    const cost = saleCost(s);
     for (const i of s.items) {
       const category = String(i.category || "").toUpperCase();
       if (category === "CEMENT") cement += i.qty;
       else if (category === "ROD") rod += i.qty;
     }
     return {
-      id: String(s._id), invoiceNo: s.invoiceNo, date: s.date, customer: s.customerId?.name || "—",
-      product: s.items.length ? s.items.map((i) => `${i.name} × ${i.qty}`).join(", ") : "Collection",
-      qty: s.items.reduce((a, i) => a + i.qty, 0), total: s.total, paid: s.paid, due: Math.max(s.total - s.paid, 0),
+      id: String(s._id), invoiceNo: s.invoiceNo || "", date: s.date, customer: s.customerId?.name || "—",
+      product: s.items.length ? s.items.map((i) => `${i.name} × ${i.qty}`).join(", ") : s.historicalImport ? "Historical invoice (aggregate totals only)" : "Collection",
+      qty: s.items.reduce((a, i) => a + i.qty, 0), total: s.total, cost, profit: s.total - cost, paid: s.paid, due: Math.max(s.total - s.paid, 0),
     };
   });
+  const cost = sales.reduce((total, sale) => total + saleCost(sale), 0);
+  const saleTotal = sales.reduce((total, sale) => total + sale.total, 0);
+  const expense = expenses.reduce((total, item) => total + item.amount, 0);
+  const profit = saleTotal - cost;
   return {
     from, to,
     totals: {
-      sale: sales.reduce((a, s) => a + s.total, 0),
+      sale: saleTotal,
+      cost,
+      profit,
+      netProfit: profit - expense,
+      due: sales.reduce((a, s) => a + Math.max(s.total - s.paid, 0), 0),
       purchase: purchases.reduce((a, p) => a + p.grandTotal, 0),
       cementQty: cement, rodQty: rod,
-      expense: expenses.reduce((a, e) => a + e.amount, 0),
+      expense,
     },
     sales: salesRows,
     opening: opening.map((o) => ({ id: String(o._id), date: o.date, customer: names.get(String(o.partyId)) || "—", amount: o.debit })),
@@ -51,12 +61,16 @@ export async function buildReport(from, to) {
 export async function buildAccounts(from, to) {
   const range = rangeOf(from, to);
   const [sales, expenses, recv] = await Promise.all([
-    Sale.find({ status: "approved", date: range, "items.0": { $exists: true } }).sort({ invoiceNo: 1 }).populate("customerId", "name").lean(),
+    Sale.find({
+      status: "approved",
+      date: range,
+      $or: [{ "items.0": { $exists: true } }, { historicalImport: true }],
+    }).sort({ invoiceNo: -1 }).populate("customerId", "name").lean(),
     Expense.aggregate([{ $match: { date: range } }, { $group: { _id: null, t: { $sum: "$amount" } } }]),
     Customer.aggregate([{ $match: { balance: { $gt: 0 } } }, { $group: { _id: null, t: { $sum: "$balance" }, n: { $sum: 1 } } }]),
   ]);
   const rows = sales.map((s) => {
-    const cost = s.items.reduce((a, i) => a + Math.round(i.qty * i.costSnapshot), 0);
+    const cost = saleCost(s);
     return { id: String(s._id), invoiceNo: s.invoiceNo, date: s.date, customer: s.customerId?.name || "—",
       sales: s.total, cost, profit: s.total - cost, due: Math.max(s.total - s.paid, 0) };
   });

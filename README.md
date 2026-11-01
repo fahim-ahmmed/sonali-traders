@@ -53,7 +53,22 @@ npm run import:customers -- data/customers.csv --date=2026-10-27 --expect=304052
 - প্রতিটি Due → `opening_due` লেজার এন্ট্রি (Sales মোটে গণ্য নয়, Receivable-এ গণ্য)।
 - নামের বন্ধনীর ব্র্যান্ড থেকে cement/rod ট্যাগ বসে।
 - `--expect` না মিললে ইমপোর্ট নিজেই থেমে যায়। আবার চালালে ডুপ্লিকেট তৈরি হয় না।
-- পুরনো ইনভয়েস ইতিহাস (INV-000001…78) আমদানি করা হয়নি — ক্লায়েন্টের সিদ্ধান্ত বাকি।
+- সংযুক্ত ঐতিহাসিক ইনভয়েস ডেটায় ১০৫টি রেকর্ড (INV-000001…105) আছে। আইটেম/পরিমাণ নেই, তাই importer কেবল aggregate invoice totals সংরক্ষণ করে; stock বা product quantity বদলায় না।
+- বর্তমান customer balance লক্ষ্য হিসেবে অক্ষুণ্ণ রাখতে historical invoice due-র বিপরীতে opening ledger entry atomically reconcile হয়। সব customer label নির্ভুলভাবে map না হওয়া পর্যন্ত কোনো write হয় না।
+
+```bash
+# Dry run: customer-name mapping না থাকলে unmatched/ambiguous labels দেখিয়ে থামে
+npm run sync:accounting
+
+# JSON object-এ কেবল unresolved source label-গুলিকে সঠিক MongoDB customer ID-তে map করে দিন
+npm run sync:accounting -- --map data/accounting-customer-map.json
+
+# Dry run যাচাই করে আলাদা অনুমোদনের পরেই write mode
+npm run sync:accounting -- --map data/accounting-customer-map.json --commit
+```
+
+`--commit` transaction-এর ভেতরে approved historical invoices, customer ledger entries ও reconciled opening balances সংরক্ষণ করে। এটি idempotent; partial/conflicting import বন্ধ করে। Production database-এ চালাতে আলাদা অনুমোদন আবশ্যক।
+এই CLI command-গুলো শুধু terminal process-এ আগে থেকে configured `MONGODB_URI` ব্যবহার করে; কোনো `.env` ফাইল পড়ে না।
 
 ## ৩. Vercel + Atlas ডিপ্লয়
 

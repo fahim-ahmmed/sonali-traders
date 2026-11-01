@@ -34,11 +34,11 @@ export default function AccountsPage() {
     t.profit >= 0
       ? { l: "Total Profit", v: t.profit, icon: CircleDollarSign, tone: "text-emerald-600", ring: "bg-emerald-50 text-emerald-600", bar: "bg-success" }
       : { l: "Total Loss", v: -t.profit, icon: TrendingDown, tone: "text-rose-600", ring: "bg-rose-50 text-rose-600", bar: "bg-danger" },
+    { l: "Total Due", hint: "On these sales", v: t.due, icon: ReceiptText, tone: t.due > 0 ? "text-rose-600" : "text-slate-400", ring: "bg-rose-50 text-rose-600", bar: "bg-danger" },
+    { l: "Total Expense", v: t.expense, icon: Wallet, tone: "text-navy-900", ring: "bg-orange-50 text-orange-600", bar: "bg-orange-500" },
     t.netProfit >= 0
       ? { l: "Net Profit", hint: "Profit − Expense", v: t.netProfit, icon: Landmark, tone: "text-emerald-600", ring: "bg-emerald-50 text-emerald-600", bar: "bg-success" }
       : { l: "Net Loss", hint: "Profit − Expense", v: -t.netProfit, icon: TrendingDown, tone: "text-rose-600", ring: "bg-rose-50 text-rose-600", bar: "bg-danger" },
-    { l: "Total Due", hint: "On these sales", v: t.due, icon: ReceiptText, tone: t.due > 0 ? "text-rose-600" : "text-slate-400", ring: "bg-rose-50 text-rose-600", bar: "bg-danger" },
-    { l: "Total Expense", v: t.expense, icon: Wallet, tone: "text-navy-900", ring: "bg-orange-50 text-orange-600", bar: "bg-orange-500" },
   ];
 
   return (
@@ -48,7 +48,7 @@ export default function AccountsPage() {
         <PrintHeader title="Accounts report" subtitle={d ? `${formatDate(`${d.from}T00:00:00+06:00`)} – ${formatDate(`${d.to}T00:00:00+06:00`)}` : ""} />
         <div className="no-print">
           <h2 className="page-title">Accounts</h2>
-          <p className="page-subtitle">Sales, profit and due balance for the selected period.</p>
+          <p className="page-subtitle">Sales, cost, profit, expense and sales due for the selected period.</p>
         </div>
 
         <section className="card no-print flex flex-wrap items-end gap-3 p-4">

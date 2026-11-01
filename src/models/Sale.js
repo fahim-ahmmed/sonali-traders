@@ -22,6 +22,8 @@ const SaleSchema = new mongoose.Schema(
     date: { type: Date, required: true },
     items: { type: [ItemSchema], default: [] },    // খালি = শুধু কালেকশন/অ্যাডভান্স
     total: { type: Number, default: 0 },           // পয়সা
+    costTotal: { type: Number, default: null },    // aggregate historical cost, in paisa
+    historicalImport: { type: Boolean, default: false },
     paid: { type: Number, default: 0 },            // পয়সা
     dueAfter: { type: Number, default: 0 },        // approve-এর পর কাস্টমার ব্যালেন্স
     status: { type: String, enum: ["pending", "approved", "declined"], default: "pending" },
