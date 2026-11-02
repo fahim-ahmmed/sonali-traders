@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { isValidId } from "./ids.js";
+import { isValidDateKey } from "./dates.js";
 
 export const saleSchema = z.object({
   clientRef: z.string().min(8).max(80),
   customerId: z.string().refine(isValidId, "Select a customer"),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a sale date"),
+  date: z.string().refine(isValidDateKey, "Choose a valid sale date"),
   items: z.array(z.object({
     productId: z.string().refine(isValidId, "Select a product"),
     qty: z.number().positive("Quantity must be more than 0"),

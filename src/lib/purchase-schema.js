@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { isValidId } from "./ids.js";
-import { dhakaDateKey } from "./dates.js";
+import { dhakaDateKey, isValidDateKey } from "./dates.js";
 
 export const purchaseSchema = z.object({
   supplierId: z.string().refine(isValidId, "Select a supplier"),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a purchase date"),
+  date: z.string().refine(isValidDateKey, "Choose a valid purchase date"),
   stockControl: z.boolean().default(true),
   items: z.array(z.object({
     productId: z.string().refine(isValidId, "Select a product"),

@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { isValidDateKey } from "./dates.js";
 
 export const expenseSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose an expense date"),
+  date: z.string().refine(isValidDateKey, "Choose a valid expense date"),
   amount: z.number().int().positive("Enter an amount more than 0"), // পয়সা
   purpose: z.string().trim().min(1, "Tell us what the expense was for").max(100),
   note: z.string().trim().max(300).optional().default(""),

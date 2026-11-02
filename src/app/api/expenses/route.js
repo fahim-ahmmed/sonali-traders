@@ -1,6 +1,6 @@
 import { connectDB } from "@/lib/db";
 import { ok, fail, requireUser } from "@/lib/api";
-import { dhakaDayRange } from "@/lib/dates";
+import { dhakaDayRange, isValidDateKey } from "@/lib/dates";
 import { dateFromKey } from "@/lib/tx";
 import { findUserById } from "@/lib/users";
 import { expenseSchema, expenseDto } from "@/lib/expense-schema";
@@ -14,16 +14,18 @@ export async function GET(req) {
   const page = Math.max(1, Number(sp.get("page")) || 1);
   const limit = Math.min(100, Math.max(1, Number(sp.get("limit")) || 25));
   await connectDB();
-  const filter = {};
+  const filter = { active: { $ne: false } };
   if (user.role !== "admin") filter.paidById = user.id; // স্টাফ শুধু নিজের খরচ দেখে
-  if (/^\d{4}-\d{2}-\d{2}$/.test(from || "")) filter.date = { $gte: dhakaDayRange(from).start };
-  if (/^\d{4}-\d{2}-\d{2}$/.test(to || "")) filter.date = { ...(filter.date || {}), $lt: dhakaDayRange(to).end };
+  if ((from && !isValidDateKey(from)) || (to && !isValidDateKey(to))) return fail("Choose valid dates", 422);
+  if (from && to && from > to) return fail("'From' date must be on or before 'To' date", 422);
+  if (from) filter.date = { $gte: dhakaDayRange(from).start };
+  if (to) filter.date = { ...(filter.date || {}), $lt: dhakaDayRange(to).end };
 
   const [items, total, sum, purposes] = await Promise.all([
     Expense.find(filter).sort({ date: -1, createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     Expense.countDocuments(filter),
     Expense.aggregate([{ $match: filter }, { $group: { _id: null, t: { $sum: "$amount" } } }]),
-    Expense.distinct("purpose", user.role === "admin" ? {} : { paidById: user.id }),
+    Expense.distinct("purpose", { active: { $ne: false }, ...(user.role === "admin" ? {} : { paidById: user.id }) }),
   ]);
   return ok({ items: items.map(expenseDto), total, totalAmount: sum[0]?.t || 0, page, pages: Math.max(1, Math.ceil(total / limit)), purposes: purposes.slice(0, 50) });
 }

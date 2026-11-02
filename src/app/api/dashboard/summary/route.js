@@ -22,11 +22,11 @@ export async function GET() {
   const [sales, ySale, purchase, ledger, supplierDue, receivable, expense] = await Promise.all([
     Sale.find({ status: "approved", date: today }).select("total items.category items.qty").lean(),
     Sale.aggregate([{ $match: { status: "approved", date: yesterday } }, { $group: { _id: null, t: { $sum: "$total" } } }]),
-    Purchase.aggregate([{ $match: { date: today } }, { $group: { _id: null, t: { $sum: "$grandTotal" } } }]),
+    Purchase.aggregate([{ $match: { active: { $ne: false }, date: today } }, { $group: { _id: null, t: { $sum: "$grandTotal" } } }]),
     LedgerEntry.aggregate([{ $match: { partyType: "customer", type: { $in: ["sale", "payment"] }, date: today } }, { $group: { _id: "$type", credit: { $sum: "$credit" } } }]),
-    Purchase.aggregate([{ $group: { _id: null, t: { $sum: { $subtract: ["$grandTotal", "$paidAmount"] } } } }]),
+    Purchase.aggregate([{ $match: { active: { $ne: false } } }, { $group: { _id: null, t: { $sum: { $subtract: ["$grandTotal", "$paidAmount"] } } } }]),
     Customer.aggregate([{ $match: { active: true, balance: { $gt: 0 } } }, { $group: { _id: null, t: { $sum: "$balance" }, n: { $sum: 1 } } }]),
-    Expense.aggregate([{ $match: { date: today } }, { $group: { _id: null, t: { $sum: "$amount" } } }]),
+    Expense.aggregate([{ $match: { active: { $ne: false }, date: today } }, { $group: { _id: null, t: { $sum: "$amount" } } }]),
   ]);
 
   let rod = 0, cement = 0;

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BadgeCheck, HandCoins, MapPin, Pencil, Phone, Printer, ReceiptText, ShoppingCart, UserRound, Wallet } from "lucide-react";
+import { ArrowLeft, BadgeCheck, HandCoins, MapPin, Pencil, Phone, Plus, Printer, ReceiptText, ShoppingCart, UserRound, Wallet } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -11,7 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { dhakaDateKey, formatDate } from "@/lib/dates";
 import { formatMoney, toPaisa } from "@/lib/money";
 
-const TYPE = { sale: ["Sale", "info"], payment: ["Payment", "success"], opening_due: ["Old Customer Due", "warning"], advance: ["Advance", "success"] };
+const TYPE = { sale: ["Sale", "info"], payment: ["Due Payment", "success"], opening_due: ["Opening Due", "warning"], advance: ["Advance", "success"] };
 
 export default function CustomerLedgerPage() {
   const { id } = useParams();
@@ -21,9 +21,19 @@ export default function CustomerLedgerPage() {
   const [pay, setPay] = useState({ amount: "", date: dhakaDateKey(), note: "" });
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
+  const [due, setDue] = useState({ amount: "", date: dhakaDateKey(), note: "" });
+  const [dueErr, setDueErr] = useState("");
+  const [savingDue, setSavingDue] = useState(false);
 
-  const load = useCallback(() => {
-    fetch(`/api/customers/${id}`).then((r) => r.json()).then((j) => j.ok ? setD(j.data) : toast(j.error, "error"));
+  const load = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/customers/${id}`);
+      const result = await response.json();
+      if (result.ok) setD(result.data);
+      else toast(result.error, "error");
+    } catch {
+      toast("Could not load this customer ledger. Check your connection and try again.", "error");
+    }
   }, [id, toast]);
   useEffect(load, [load]);
   useEffect(() => { fetch("/api/settings").then((r) => r.json()).then((j) => j.ok && setCompany(j.data)); }, []);
@@ -31,15 +41,41 @@ export default function CustomerLedgerPage() {
   async function receive(e) {
     e.preventDefault();
     if (saving) return;
-    if (!(Number(pay.amount) > 0)) return setErr("Enter an amount more than 0");
+    if (!(toPaisa(pay.amount) > 0)) return setErr("Enter an amount more than 0");
     setErr(""); setSaving(true);
-    const res = await fetch(`/api/customers/${id}/payments`, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: toPaisa(pay.amount), date: pay.date, note: pay.note }) }).then((r) => r.json());
-    setSaving(false);
-    if (!res.ok) return toast(res.error, "error");
-    toast("Payment saved");
-    setPay({ amount: "", date: dhakaDateKey(), note: "" });
-    load();
+    try {
+      const response = await fetch(`/api/customers/${id}/payments`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: toPaisa(pay.amount), date: pay.date, note: pay.note }) });
+      const result = await response.json();
+      if (!result.ok) return toast(result.error, "error");
+      toast("Payment saved");
+      setPay({ amount: "", date: dhakaDateKey(), note: "" });
+      await load();
+    } catch {
+      toast("Could not save payment. Check your connection and try again.", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addDue(e) {
+    e.preventDefault();
+    if (savingDue) return;
+    if (!(toPaisa(due.amount) > 0)) return setDueErr("Enter a due amount more than 0");
+    setDueErr(""); setSavingDue(true);
+    try {
+      const response = await fetch("/api/customers/opening-due", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: id, amount: toPaisa(due.amount), date: due.date, note: due.note }) });
+      const result = await response.json();
+      if (!result.ok) return toast(result.error, "error");
+      toast("Due added to customer ledger");
+      setDue({ amount: "", date: dhakaDateKey(), note: "" });
+      await load();
+    } catch {
+      toast("Could not add due. Check your connection and try again.", "error");
+    } finally {
+      setSavingDue(false);
+    }
   }
 
   const c = d?.customer;
@@ -139,6 +175,24 @@ export default function CustomerLedgerPage() {
                 <Button type="submit" loading={saving} variant="success" className="lg:mt-[22px]">Save payment</Button>
               </div>
               <p className="px-5 pb-4 text-xs text-slate-500">Paying more than the due is kept as the customer&apos;s advance.</p>
+            </form>
+
+            <form onSubmit={addDue} className="card no-print overflow-hidden">
+              <div className="card-header">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-50 text-amber-700"><Plus className="h-4 w-4" aria-hidden /></span>
+                  <div>
+                    <h3 className="card-title">Add New Due / Previous Due</h3>
+                    <p className="text-xs text-slate-500">Adds a debit entry and increases this customer&apos;s outstanding balance.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid items-start gap-4 p-5 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_2fr_auto]">
+                <Input label="Due amount" type="number" min="0.01" step="0.01" inputMode="decimal" value={due.amount} onChange={(e) => setDue({ ...due, amount: e.target.value })} error={dueErr} />
+                <Input label="Date" type="date" value={due.date} onChange={(e) => setDue({ ...due, date: e.target.value })} />
+                <Input label="Note" value={due.note} onChange={(e) => setDue({ ...due, note: e.target.value })} />
+                <Button type="submit" loading={savingDue} className="lg:mt-[22px]">Add due</Button>
+              </div>
             </form>
 
             {/* লেজার */}

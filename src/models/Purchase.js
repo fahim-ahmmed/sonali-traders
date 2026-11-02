@@ -22,6 +22,7 @@ const PurchaseSchema = new mongoose.Schema(
     items: { type: [ItemSchema], validate: (v) => v.length > 0 },
     grandTotal: { type: Number, required: true },
     paidAmount: { type: Number, default: 0 },
+    active: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

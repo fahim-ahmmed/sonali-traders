@@ -10,6 +10,7 @@ const ExpenseSchema = new mongoose.Schema(
     paidById: { type: String, required: true },
     paidByName: { type: String, default: "" },
     createdBy: { type: String },
+    active: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

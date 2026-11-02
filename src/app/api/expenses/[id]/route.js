@@ -21,7 +21,7 @@ export async function PUT(req, { params }) {
     if (!u) return fail("Selected person not found", 422);
     Object.assign(set, { paidById: String(u._id), paidByName: u.name, paidByType: u.role === "admin" ? "admin" : "staff" });
   }
-  const e = await Expense.findByIdAndUpdate(id, set, { new: true });
+  const e = await Expense.findOneAndUpdate({ _id: id, active: { $ne: false } }, set, { new: true });
   if (!e) return fail("Expense not found", 404);
   return ok(expenseDto(e));
 }
@@ -32,6 +32,7 @@ export async function DELETE(_req, { params }) {
   const { id } = await params;
   if (!isValidId(id)) return fail("Invalid id", 400);
   await connectDB();
-  await Expense.findByIdAndDelete(id);
-  return ok({ deleted: true });
+  const e = await Expense.findOneAndUpdate({ _id: id, active: { $ne: false } }, { $set: { active: false } }, { new: true });
+  if (!e) return fail("Expense not found", 404);
+  return ok({ archived: true });
 }

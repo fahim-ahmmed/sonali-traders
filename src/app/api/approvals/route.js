@@ -1,6 +1,6 @@
 import { connectDB } from "@/lib/db";
-import { ok, requireUser } from "@/lib/api";
-import { dhakaDayRange } from "@/lib/dates";
+import { fail, ok, requireUser } from "@/lib/api";
+import { dhakaDayRange, isValidDateKey } from "@/lib/dates";
 import Sale from "@/models/Sale";
 
 export async function GET(req) {
@@ -16,7 +16,8 @@ export async function GET(req) {
   await connectDB();
   const filter = { status };
   if (staff) filter.submittedBy = staff;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) { const r = dhakaDayRange(date); filter.date = { $gte: r.start, $lt: r.end }; }
+  if (date && !isValidDateKey(date)) return fail("Choose a valid date", 422);
+  if (date) { const r = dhakaDayRange(date); filter.date = { $gte: r.start, $lt: r.end }; }
 
   const [items, total, pendingTotal, staffRows] = await Promise.all([
     Sale.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).populate("customerId", "name phone address balance").lean(),

@@ -14,16 +14,25 @@ export async function GET(_req, { params }) {
   await connectDB();
   const c = await Customer.findById(id).lean();
   if (!c || !c.active) return fail("Customer not found", 404);
-  const entries = await LedgerEntry.find({ partyId: id }).sort({ date: 1, createdAt: 1 }).limit(2000).lean();
-  const totalPurchases = entries.filter((e) => e.type === "sale").reduce((s, e) => s + e.debit, 0);
-  const totalPayments = entries.reduce((s, e) => s + e.credit, 0);
+  const entries = await LedgerEntry.find({ partyType: "customer", partyId: id })
+    .sort({ date: 1, createdAt: 1, _id: 1 }).lean();
+  let balance = 0;
+  let totalPurchases = 0;
+  let totalPayments = 0;
+  const rows = entries.map((entry) => {
+    balance += (entry.debit || 0) - (entry.credit || 0);
+    if (entry.type === "sale") totalPurchases += entry.debit;
+    totalPayments += entry.credit;
+    return {
+      id: String(entry._id), date: entry.date, type: entry.type, description: entry.description, qty: entry.qty,
+      total: entry.debit, received: entry.credit, balance, note: entry.note,
+    };
+  });
+  const customer = customerDto({ ...c, balance });
   return ok({
-    customer: customerDto(c),
-    summary: { totalPurchases, totalPayments, due: Math.max(c.balance, 0), advance: Math.max(-c.balance, 0) },
-    entries: entries.map((e) => ({
-      id: String(e._id), date: e.date, type: e.type, description: e.description, qty: e.qty,
-      total: e.debit, received: e.credit, balance: e.balanceAfter, note: e.note,
-    })),
+    customer,
+    summary: { totalPurchases, totalPayments, due: Math.max(balance, 0), advance: Math.max(-balance, 0) },
+    entries: rows,
   });
 }
 

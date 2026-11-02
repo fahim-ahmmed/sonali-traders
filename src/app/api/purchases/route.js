@@ -14,8 +14,8 @@ export async function GET(req) {
   const limit = Math.min(100, Math.max(1, Number(sp.get("limit")) || 25));
   await connectDB();
   const [items, total] = await Promise.all([
-    Purchase.find().sort({ date: -1, createdAt: -1 }).skip((page - 1) * limit).limit(limit).populate("supplierId", "name company").lean(),
-    Purchase.countDocuments(),
+    Purchase.find({ active: { $ne: false } }).sort({ date: -1, createdAt: -1 }).skip((page - 1) * limit).limit(limit).populate("supplierId", "name company").lean(),
+    Purchase.countDocuments({ active: { $ne: false } }),
   ]);
   return ok({ items: items.map((p) => purchaseDto(p, p.supplierId)), total, page, pages: Math.max(1, Math.ceil(total / limit)) });
 }

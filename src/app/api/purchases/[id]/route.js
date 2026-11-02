@@ -12,7 +12,7 @@ export async function GET(_req, { params }) {
   const { id } = await params;
   if (!isValidId(id)) return fail("Invalid id", 400);
   await connectDB();
-  const p = await Purchase.findById(id).populate("supplierId", "name company").lean();
+  const p = await Purchase.findOne({ _id: id, active: { $ne: false } }).populate("supplierId", "name company").lean();
   if (!p) return fail("Purchase not found", 404);
   return ok(purchaseDto(p, p.supplierId));
 }
@@ -27,7 +27,7 @@ export async function PUT(req, { params }) {
   if (!parsed.success) return fail(parsed.error.issues[0].message, 422);
   try {
     await withTx(async (session) => {
-      const old = await Purchase.findById(id).session(session);
+      const old = await Purchase.findOne({ _id: id, active: { $ne: false } }).session(session);
       if (!old) throw new AppError("Purchase not found", 404);
       await reverseStock(old, session);
       const fields = await buildPurchase(parsed.data, session);
@@ -46,11 +46,12 @@ export async function DELETE(_req, { params }) {
   if (!isValidId(id)) return fail("Invalid id", 400);
   try {
     await withTx(async (session) => {
-      const p = await Purchase.findById(id).session(session);
+      const p = await Purchase.findOne({ _id: id, active: { $ne: false } }).session(session);
       if (!p) throw new AppError("Purchase not found", 404);
-      await reverseStock(p, session); // স্টক ফিরে যায়
-      await Purchase.deleteOne({ _id: id }, { session });
+      await reverseStock(p, session, { preserveHistory: true });
+      p.active = false;
+      await p.save({ session });
     });
-    return ok({ deleted: true });
+    return ok({ archived: true });
   } catch (e) { return handleError(e); }
 }

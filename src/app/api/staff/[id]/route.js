@@ -18,7 +18,7 @@ export async function GET(_req, { params }) {
   const u = await findStaffUser(s);
   const [sales, expenses] = await Promise.all([
     Sale.find({ submittedBy: s.userId }).sort({ createdAt: -1 }).limit(30).populate("customerId", "name").lean(),
-    Expense.find({ paidById: s.userId }).sort({ date: -1 }).limit(30).lean(),
+    Expense.find({ active: { $ne: false }, paidById: s.userId }).sort({ date: -1 }).limit(30).lean(),
   ]);
   return ok({
     staff: staffDto(s, u),

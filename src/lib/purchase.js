@@ -25,7 +25,10 @@ export async function buildPurchase(data, session) {
     };
   });
   const grandTotal = items.reduce((s, i) => s + i.lineTotal, 0);
-  const paidAmount = data.paidAmount == null ? grandTotal : Math.min(data.paidAmount, grandTotal);
+  if (data.paidAmount != null && data.paidAmount > grandTotal) {
+    throw new AppError("Paid amount can't be more than the grand total", 422);
+  }
+  const paidAmount = data.paidAmount == null ? grandTotal : data.paidAmount;
   return { supplierId: supplier._id, date: dateFromKey(data.date), stockControl: data.stockControl, items, grandTotal, paidAmount };
 }
 
@@ -40,8 +43,22 @@ export async function applyStock(p, session) {
   );
 }
 
-export async function reverseStock(p, session) {
+export async function reverseStock(p, session, { preserveHistory = false } = {}) {
   if (!p.stockControl) return;
   for (const it of p.items) await Product.updateOne({ _id: it.productId }, { $inc: { stock: -it.qty } }, { session });
+  if (preserveHistory) {
+    await StockMovement.insertMany(
+      p.items.map((it) => ({
+        productId: it.productId,
+        date: new Date(),
+        type: "adjust",
+        qty: -it.qty,
+        refId: p._id,
+        note: `Archived purchase ${String(p._id)}`,
+      })),
+      { session }
+    );
+    return;
+  }
   await StockMovement.deleteMany({ refId: p._id, type: "purchase" }, { session });
 }

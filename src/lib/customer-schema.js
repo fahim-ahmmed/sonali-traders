@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { BD_PHONE } from "./regex.js";
 import { isValidId } from "./ids.js";
+import { isValidDateKey } from "./dates.js";
 
 export const customerSchema = z.object({
   name: z.string().trim().min(1, "Customer name is required").max(150),
@@ -8,7 +9,7 @@ export const customerSchema = z.object({
   address: z.string().trim().max(300).optional().default(""),
 });
 
-const dateKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date");
+const dateKey = z.string().refine(isValidDateKey, "Choose a valid date");
 
 export const paymentSchema = z.object({
   amount: z.number().int().positive("Enter an amount more than 0"), // পয়সা

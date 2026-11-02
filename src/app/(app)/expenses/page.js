@@ -75,7 +75,7 @@ export default function ExpensesPage() {
     const res = await fetch(`/api/expenses/${deleting.id}`, { method: "DELETE" }).then((r) => r.json());
     setBusy(false); setDeleting(null);
     if (!res.ok) return toast(res.error, "error");
-    toast("Expense deleted"); load();
+    toast("Expense archived"); load();
   }
 
   const admins = payers.filter((p) => p.role === "admin"), staff = payers.filter((p) => p.role === "staff");
@@ -189,7 +189,7 @@ export default function ExpensesPage() {
           </div>
         )}
       </Modal>
-      <ConfirmDialog open={!!deleting} onClose={() => setDeleting(null)} onConfirm={remove} loading={busy} title="Delete expense?" message={deleting ? `${deleting.purpose} — ${formatMoney(deleting.amount)} will be removed from all reports.` : ""} />
+      <ConfirmDialog open={!!deleting} onClose={() => setDeleting(null)} onConfirm={remove} loading={busy} title="Archive expense?" message={deleting ? `${deleting.purpose} — ${formatMoney(deleting.amount)} will be excluded from active reports. Its record will be retained.` : ""} />
     </>
   );
 }

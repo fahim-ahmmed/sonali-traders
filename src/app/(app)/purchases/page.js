@@ -28,7 +28,7 @@ export default function PurchaseListPage() {
     const res = await fetch(`/api/purchases/${deleting.id}`, { method: "DELETE" }).then((r) => r.json());
     setBusy(false); setDeleting(null);
     if (!res.ok) return toast(res.error, "error");
-    toast("Purchase deleted and stock restored"); load();
+    toast("Purchase archived and stock restored"); load();
   }
 
   return (
@@ -103,7 +103,7 @@ export default function PurchaseListPage() {
         )}
       </Modal>
       <ConfirmDialog open={!!deleting} onClose={() => setDeleting(null)} onConfirm={remove} loading={busy}
-        title="Delete purchase?" message="The stock added by this purchase will be taken back out. This can't be undone." />
+        title="Archive purchase?" message="The stock added by this purchase will be reversed. The purchase and its audit history will be retained." />
     </>
   );
 }

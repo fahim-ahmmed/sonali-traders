@@ -1,12 +1,11 @@
-import { dhakaDayRange } from "./dates";
+import { dhakaDayRange, isValidDateKey } from "./dates";
 import Sale from "@/models/Sale";
 import Purchase from "@/models/Purchase";
 import Expense from "@/models/Expense";
 import LedgerEntry from "@/models/LedgerEntry";
 import Customer from "@/models/Customer";
 
-const KEY = /^\d{4}-\d{2}-\d{2}$/;
-export const validKey = (k) => KEY.test(k || "") && !isNaN(new Date(`${k}T00:00:00+06:00`));
+export const validKey = isValidDateKey;
 export const rangeOf = (from, to) => ({ $gte: dhakaDayRange(from).start, $lt: dhakaDayRange(to).end });
 const saleCost = (sale) => sale.costTotal ?? sale.items.reduce((total, item) => total + Math.round(item.qty * item.costSnapshot), 0);
 
@@ -15,8 +14,8 @@ export async function buildReport(from, to) {
   const range = rangeOf(from, to);
   const [sales, purchases, expenses, opening] = await Promise.all([
     Sale.find({ status: "approved", date: range }).sort({ date: 1, invoiceNo: 1 }).populate("customerId", "name").lean(),
-    Purchase.find({ date: range }).select("grandTotal").lean(),
-    Expense.find({ date: range }).sort({ date: 1, createdAt: 1 }).lean(),
+    Purchase.find({ active: { $ne: false }, date: range }).select("grandTotal").lean(),
+    Expense.find({ active: { $ne: false }, date: range }).sort({ date: 1, createdAt: 1 }).lean(),
     LedgerEntry.find({ partyType: "customer", type: "opening_due", date: range }).sort({ date: 1 }).lean(),
   ]);
   const names = new Map((await Customer.find({ _id: { $in: opening.map((o) => o.partyId) } }).select("name").lean()).map((c) => [String(c._id), c.name]));
@@ -66,7 +65,7 @@ export async function buildAccounts(from, to) {
       date: range,
       $or: [{ "items.0": { $exists: true } }, { historicalImport: true }],
     }).sort({ invoiceNo: -1 }).populate("customerId", "name").lean(),
-    Expense.aggregate([{ $match: { date: range } }, { $group: { _id: null, t: { $sum: "$amount" } } }]),
+    Expense.aggregate([{ $match: { active: { $ne: false }, date: range } }, { $group: { _id: null, t: { $sum: "$amount" } } }]),
     Customer.aggregate([{ $match: { balance: { $gt: 0 } } }, { $group: { _id: null, t: { $sum: "$balance" }, n: { $sum: 1 } } }]),
   ]);
   const rows = sales.map((s) => {
