@@ -2,14 +2,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BadgeCheck, HandCoins, MapPin, Pencil, Phone, Plus, Printer, ReceiptText, ShoppingCart, UserRound, Wallet } from "lucide-react";
+import { ArrowLeft, BadgeCheck, HandCoins, MapPin, Pencil, Phone, Plus, Printer, ReceiptText, ShoppingCart, Trash2, UserRound, Wallet } from "lucide-react";
 import PageHeader from "@/components/layout/PageHeader";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import Modal, { ConfirmDialog } from "@/components/ui/Modal";
 import { Badge, EmptyState, Skeleton } from "@/components/ui/Feedback";
 import { useToast } from "@/components/ui/Toast";
 import { dhakaDateKey, formatDate } from "@/lib/dates";
-import { formatMoney, toPaisa } from "@/lib/money";
+import { formatMoney, toPaisa, toTaka } from "@/lib/money";
 
 const TYPE = { sale: ["Sale", "info"], payment: ["Due Payment", "success"], opening_due: ["Opening Due", "warning"], advance: ["Advance", "success"] };
 
@@ -25,6 +26,11 @@ export default function CustomerLedgerPage() {
   const [dueErr, setDueErr] = useState("");
   const [savingDue, setSavingDue] = useState(false);
 
+  // Edit ও Delete স্টেট
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [deletingEntry, setDeletingEntry] = useState(null);
+  const [entryBusy, setEntryBusy] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const response = await fetch(`/api/customers/${id}`);
@@ -35,7 +41,7 @@ export default function CustomerLedgerPage() {
       toast("Could not load this customer ledger. Check your connection and try again.", "error");
     }
   }, [id, toast]);
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
   useEffect(() => { fetch("/api/settings").then((r) => r.json()).then((j) => j.ok && setCompany(j.data)); }, []);
 
   async function receive(e) {
@@ -75,6 +81,68 @@ export default function CustomerLedgerPage() {
       toast("Could not add due. Check your connection and try again.", "error");
     } finally {
       setSavingDue(false);
+    }
+  }
+
+  function openEditModal(entry) {
+    setEditingEntry({
+      id: entry.id,
+      type: entry.type,
+      date: dhakaDateKey(new Date(entry.date)),
+      debit: entry.total ? String(toTaka(entry.total)) : "0",
+      credit: entry.received ? String(toTaka(entry.received)) : "0",
+      description: entry.description || "",
+      note: entry.note || "",
+    });
+  }
+
+  async function saveEditedEntry(e) {
+    e.preventDefault();
+    if (entryBusy || !editingEntry) return;
+    const debitP = toPaisa(editingEntry.debit);
+    const creditP = toPaisa(editingEntry.credit);
+    if (debitP <= 0 && creditP <= 0) {
+      return toast("Enter an amount greater than 0", "error");
+    }
+    setEntryBusy(true);
+    try {
+      const res = await fetch(`/api/customers/${id}/ledger/${editingEntry.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: editingEntry.date,
+          debit: debitP,
+          credit: creditP,
+          description: editingEntry.description,
+          note: editingEntry.note,
+        }),
+      }).then((r) => r.json());
+      if (!res.ok) return toast(res.error, "error");
+      toast("Ledger entry updated");
+      setEditingEntry(null);
+      await load();
+    } catch {
+      toast("Could not update ledger entry.", "error");
+    } finally {
+      setEntryBusy(false);
+    }
+  }
+
+  async function confirmDeleteEntry() {
+    if (entryBusy || !deletingEntry) return;
+    setEntryBusy(true);
+    try {
+      const res = await fetch(`/api/customers/${id}/ledger/${deletingEntry.id}`, {
+        method: "DELETE",
+      }).then((r) => r.json());
+      if (!res.ok) return toast(res.error, "error");
+      toast("Ledger entry deleted and balance recalculated");
+      setDeletingEntry(null);
+      await load();
+    } catch {
+      toast("Could not delete ledger entry.", "error");
+    } finally {
+      setEntryBusy(false);
     }
   }
 
@@ -203,22 +271,45 @@ export default function CustomerLedgerPage() {
               </div>
               {!d.entries.length ? <EmptyState icon={ReceiptText} title="No ledger entries found yet" hint="Sales, payments and old dues will appear here." /> : (
                 <div className="table-wrap print-expand max-h-[70vh]">
-                  <table className="w-full min-w-[860px]">
+                  <table className="w-full min-w-[960px]">
                     <thead><tr>
                       <th className="th">Date</th><th className="th">Type</th><th className="th">Description</th><th className="th text-right">Quantity</th>
                       <th className="th text-right">Total</th><th className="th text-right">Paid / Received</th><th className="th text-right">Balance Due</th><th className="th">Note</th>
+                      <th className="th no-print text-right">Actions</th>
                     </tr></thead>
                     <tbody className="rows">
                       {d.entries.map((e) => (
                         <tr key={e.id}>
                           <td className="td num whitespace-nowrap text-slate-500">{formatDate(e.date)}</td>
-                          <td className="td"><Badge tone={TYPE[e.type][1]}>{TYPE[e.type][0]}</Badge></td>
+                          <td className="td"><Badge tone={TYPE[e.type]?.[1] || "neutral"}>{TYPE[e.type]?.[0] || e.type}</Badge></td>
                           <td className="td text-navy-900">{e.description}</td>
                           <td className="td num text-right">{e.qty || "—"}</td>
                           <td className="td num text-right">{e.total ? formatMoney(e.total) : "—"}</td>
                           <td className="td num text-right font-medium text-emerald-600">{e.received ? formatMoney(e.received) : "—"}</td>
                           <td className={`td num text-right font-semibold ${e.balance > 0 ? "text-rose-600" : "text-emerald-600"}`}>{e.balance < 0 ? `${formatMoney(-e.balance)} adv.` : formatMoney(e.balance)}</td>
                           <td className="td text-slate-500">{e.note || "—"}</td>
+                          <td className="td no-print whitespace-nowrap text-right">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(e)}
+                                aria-label="Edit ledger entry"
+                                title="Edit entry"
+                                className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-brand-100 hover:bg-brand-50 hover:text-brand-700"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingEntry(e)}
+                                aria-label="Delete ledger entry"
+                                title="Delete entry"
+                                className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -229,6 +320,72 @@ export default function CustomerLedgerPage() {
           </>
         )}
       </main>
+
+      {/* Ledger Entry Edit Modal */}
+      <Modal open={!!editingEntry} onClose={() => !entryBusy && setEditingEntry(null)} title="Edit Ledger Entry">
+        {editingEntry && (
+          <form onSubmit={saveEditedEntry} className="space-y-4">
+            <Input
+              label="Date"
+              type="date"
+              value={editingEntry.date}
+              onChange={(e) => setEditingEntry({ ...editingEntry, date: e.target.value })}
+              required
+            />
+            {(editingEntry.type === "sale" || editingEntry.type === "opening_due") && (
+              <Input
+                label={editingEntry.type === "sale" ? "Total Sale Amount (৳)" : "Due Amount (৳)"}
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                value={editingEntry.debit}
+                onChange={(e) => setEditingEntry({ ...editingEntry, debit: e.target.value })}
+              />
+            )}
+            {(editingEntry.type === "sale" || editingEntry.type === "payment" || editingEntry.type === "advance") && (
+              <Input
+                label="Paid / Received Amount (৳)"
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                value={editingEntry.credit}
+                onChange={(e) => setEditingEntry({ ...editingEntry, credit: e.target.value })}
+              />
+            )}
+            <Input
+              label="Description"
+              value={editingEntry.description}
+              onChange={(e) => setEditingEntry({ ...editingEntry, description: e.target.value })}
+            />
+            <Input
+              label="Note (optional)"
+              value={editingEntry.note}
+              onChange={(e) => setEditingEntry({ ...editingEntry, note: e.target.value })}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" disabled={entryBusy} onClick={() => setEditingEntry(null)}>Cancel</Button>
+              <Button type="submit" loading={entryBusy}>Save changes</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Ledger Entry Delete Confirmation */}
+      <ConfirmDialog
+        open={!!deletingEntry}
+        onClose={() => !entryBusy && setDeletingEntry(null)}
+        onConfirm={confirmDeleteEntry}
+        loading={entryBusy}
+        confirmText="Delete Entry"
+        title="Delete this ledger entry?"
+        message={
+          deletingEntry
+            ? `${deletingEntry.description || TYPE[deletingEntry.type]?.[0] || "This entry"} will be permanently removed and the customer's balance will be recalculated automatically.${deletingEntry.type === "sale" ? " Product stock from this sale will also be restored." : ""}`
+            : ""
+        }
+      />
     </>
   );
 }

@@ -1,9 +1,9 @@
 import Customer from "../models/Customer.js";
 import LedgerEntry from "../models/LedgerEntry.js";
+import Sale from "../models/Sale.js";
 import { AppError } from "./tx-core.js";
 
-// balance = Σ debit − Σ credit । সব কাস্টমার-লেনদেন এই একটি ফাংশন দিয়ে (Sale approve-ও ধাপ ৫/৬-এ)
-// customer.balance atomic $inc, তাই balanceAfter সবসময় সঠিক।
+// balance = Σ debit − Σ credit । সব কাস্টমার-লেনদেন এই একটি ফাংশন দিয়ে
 export async function postEntry(e, session) {
   if (Array.isArray(e)) return postEntryBatch(e, session);
 
@@ -16,6 +16,43 @@ export async function postEntry(e, session) {
     { session }
   );
   return { entry: row, balance: c.balance };
+}
+
+// এডিট বা ডিলিটের পর কাস্টমারের সম্পূর্ণ লেজার ও ব্যালেন্স পুনরায় হিসাব করে
+export async function recalculateCustomerLedger(customerId, session) {
+  const entries = await LedgerEntry.find({ partyType: "customer", partyId: customerId })
+    .sort({ date: 1, createdAt: 1, _id: 1 })
+    .session(session)
+    .lean();
+
+  let balance = 0;
+  const ledgerUpdates = [];
+  const saleUpdates = [];
+
+  for (const entry of entries) {
+    balance += (entry.debit || 0) - (entry.credit || 0);
+    if (entry.balanceAfter !== balance) {
+      ledgerUpdates.push({
+        updateOne: { filter: { _id: entry._id }, update: { $set: { balanceAfter: balance } } },
+      });
+    }
+    if (entry.type === "sale" && entry.refId) {
+      saleUpdates.push({
+        updateOne: { filter: { _id: entry.refId }, update: { $set: { dueAfter: balance } } },
+      });
+    }
+  }
+
+  if (ledgerUpdates.length) await LedgerEntry.bulkWrite(ledgerUpdates, { session, ordered: true });
+  if (saleUpdates.length) await Sale.bulkWrite(saleUpdates, { session, ordered: true });
+
+  const updated = await Customer.findByIdAndUpdate(
+    customerId,
+    { $set: { balance } },
+    { new: true, session }
+  );
+  if (!updated) throw new AppError("Customer not found", 404);
+  return balance;
 }
 
 async function postEntryBatch(entries, session) {

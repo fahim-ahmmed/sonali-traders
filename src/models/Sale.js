@@ -21,7 +21,9 @@ const SaleSchema = new mongoose.Schema(
     customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true },
     date: { type: Date, required: true },
     items: { type: [ItemSchema], default: [] },    // খালি = শুধু কালেকশন/অ্যাডভান্স
-    total: { type: Number, default: 0 },           // পয়সা
+    extraCostLabel: { type: String, default: "" }, // যেমন: গাড়ি ভাড়া / লেবার খরচ
+    extraCost: { type: Number, default: 0 },       // পয়সা
+    total: { type: Number, default: 0 },           // পয়সা (items lineTotal + extraCost)
     costTotal: { type: Number, default: null },    // aggregate historical cost, in paisa
     historicalImport: { type: Boolean, default: false },
     paid: { type: Number, default: 0 },            // পয়সা

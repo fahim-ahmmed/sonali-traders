@@ -11,7 +11,7 @@ const schema = z.object({
 const dto = (c) => ({ id: String(c._id), category: c.category, brand: c.brand });
 
 export async function GET() {
-  const { error } = await requireAny(["product", "pos", "purchase"]);
+  const { error } = await requireAny(["product", "pos", "purchase", "customer_list"]);
   if (error) return error;
   await connectDB();
   const items = await Category.find().sort({ category: 1, brand: 1 }).lean();

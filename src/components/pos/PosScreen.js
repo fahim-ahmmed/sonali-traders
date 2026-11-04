@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ChevronDown, Info, Loader2, PackageOpen, Plus, Trash2, UserPlus, UserRound } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Coins, Info, Loader2, PackageOpen, Plus, Trash2, UserPlus, UserRound } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input, { Textarea } from "@/components/ui/Input";
 import ProductSelect from "@/components/shared/ProductSelect";
@@ -14,12 +14,15 @@ import { formatMoney, toPaisa, toTaka } from "@/lib/money";
 const newRef = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 let seq = 0;
 const blank = () => ({ key: ++seq, productId: "", product: null, qty: "", rate: "" });
+const unitOf = (product) => (String(product?.category || "").toUpperCase() === "ROD" ? "KG" : "Bag");
 
 export default function PosScreen({ isAdmin }) {
   const { toast } = useToast();
   const [customer, setCustomer] = useState(null);
   const [date, setDate] = useState(dhakaDateKey());
   const [lines, setLines] = useState([blank()]);
+  const [extraCostLabel, setExtraCostLabel] = useState("");
+  const [extraCost, setExtraCost] = useState("");
   const [paid, setPaid] = useState("");
   const [remarks, setRemarks] = useState("");
   const [track, setTrack] = useState("");
@@ -31,9 +34,11 @@ export default function PosScreen({ isAdmin }) {
   const clientRef = useRef(newRef());
   const root = useRef(null);
 
-  // ---- Sale Summary সূত্র (মাস্টার প্ল্যান ৮.২) ----
+  // ---- Sale Summary সূত্র ----
   const lineTotal = (l) => Math.round((Number(l.qty) || 0) * toPaisa(l.rate));
-  const total = lines.reduce((s, l) => s + lineTotal(l), 0);
+  const itemsSubtotal = lines.reduce((s, l) => s + lineTotal(l), 0);
+  const extraCostP = toPaisa(extraCost);
+  const total = itemsSubtotal + extraCostP;
   const paidP = toPaisa(paid);
   const balance = customer?.balance ?? 0;
   const oldDue = Math.max(balance, 0);
@@ -63,8 +68,9 @@ export default function PosScreen({ isAdmin }) {
       else if (l.rate === "" || Number(l.rate) < 0) le[l.key] = "Enter a selling price";
     });
     if (Object.keys(le).length) e.lines = le;
+    if (extraCost !== "" && Number(extraCost) < 0) e.extraCost = "Extra cost can't be negative";
     if (paid !== "" && Number(paid) < 0) e.paid = "Paid amount can't be negative";
-    if (!filled.length && !(paidP > 0)) e.general = "Add products for a sale, or enter a payment amount";
+    if (!filled.length && !(paidP > 0) && !(extraCostP > 0)) e.general = "Add products for a sale, or enter a payment amount";
     setErrors(e);
     return { ok: !Object.keys(e).length, filled };
   }
@@ -74,11 +80,21 @@ export default function PosScreen({ isAdmin }) {
     const { ok, filled } = validate();
     if (!ok) return;
     setSaving(true);
-    const res = await fetch("/api/sales", { method: "POST", headers: { "Content-Type": "application/json" },
+    const res = await fetch("/api/sales", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        clientRef: clientRef.current, customerId: customer.id, date, paid: paidP, remarks, trackNumber: track,
+        clientRef: clientRef.current,
+        customerId: customer.id,
+        date,
+        extraCostLabel: extraCostLabel.trim(),
+        extraCost: extraCostP,
+        paid: paidP,
+        remarks,
+        trackNumber: track,
         items: filled.map((l) => ({ productId: l.productId, qty: Number(l.qty), rate: toPaisa(l.rate) })),
-      }) }).then((r) => r.json()).catch(() => ({ ok: false, error: "Network problem. Check your connection and try again." }));
+      }),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "Network problem. Check your connection and try again." }));
     setSaving(false);
     if (!res.ok) return toast(res.error, "error");
     toast(res.data.status === "approved" ? "Sale completed" : "Sent for approval");
@@ -87,7 +103,16 @@ export default function PosScreen({ isAdmin }) {
 
   function reset() {
     clientRef.current = newRef();
-    setCustomer(null); setLines([blank()]); setPaid(""); setRemarks(""); setTrack(""); setErrors({}); setDone(null); setMore(false);
+    setCustomer(null);
+    setLines([blank()]);
+    setExtraCostLabel("");
+    setExtraCost("");
+    setPaid("");
+    setRemarks("");
+    setTrack("");
+    setErrors({});
+    setDone(null);
+    setMore(false);
     setDate(dhakaDateKey());
   }
 
@@ -170,11 +195,12 @@ export default function PosScreen({ isAdmin }) {
             </button>
           </div>
           <div className="hidden grid-cols-[2fr_1fr_1fr_1fr_40px] gap-3 border-b border-slate-100 bg-slate-50 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 sm:grid">
-            <span>Product</span><span>Quantity</span><span>Selling Price</span><span className="text-right">Line Total</span><span />
+            <span>Product</span><span>Quantity (Bag / KG)</span><span>Selling Price</span><span className="text-right">Line Total</span><span />
           </div>
           <div className="divide-y divide-slate-100">
             {lines.map((l, i) => {
               const p = l.product;
+              const unit = p ? unitOf(p) : "";
               const err = errors.lines?.[l.key];
               const short = p && Number(l.qty) > p.stock;
               return (
@@ -186,12 +212,19 @@ export default function PosScreen({ isAdmin }) {
                         onSelect={(product) => { pickProduct(i, product); focusField(i, "qty"); }} />
                     </div>
                     <div>
-                      <span className="field-label sm:hidden">Quantity</span>
-                      <input type="number" min="0" step="any" inputMode="decimal" data-line={i} data-field="qty" value={l.qty} placeholder="0" aria-label="Quantity"
-                        className="field num" onChange={(e) => setLine(i, { qty: e.target.value })} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), focusField(i, "rate"))} />
+                      <span className="field-label sm:hidden">Quantity {unit ? `(${unit})` : ""}</span>
+                      <div className="relative">
+                        <input type="number" min="0" step="any" inputMode="decimal" data-line={i} data-field="qty" value={l.qty} placeholder="0" aria-label="Quantity"
+                          className={`field num ${unit ? "pr-12" : ""}`} onChange={(e) => setLine(i, { qty: e.target.value })} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), focusField(i, "rate"))} />
+                        {unit && (
+                          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-600">
+                            {unit}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div>
-                      <span className="field-label sm:hidden">Selling Price</span>
+                      <span className="field-label sm:hidden">Selling Price {unit ? `(per ${unit})` : ""}</span>
                       <input type="number" min="0" step="0.01" inputMode="decimal" data-line={i} data-field="rate" value={l.rate} placeholder="0.00" aria-label="Selling price"
                         className="field num" onChange={(e) => setLine(i, { rate: e.target.value })} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), nextLine(i))} />
                     </div>
@@ -208,8 +241,8 @@ export default function PosScreen({ isAdmin }) {
                     <p className={`mt-2 flex items-center gap-1.5 text-xs ${short ? "text-amber-700" : "text-slate-500"}`}>
                       {short ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden /> : <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />}
                       {short
-                        ? <>Only <b className="num">{p.stock}</b> in stock — the sale will still go through.</>
-                        : <>In stock: <b className="num font-semibold text-slate-700">{p.stock}</b></>}
+                        ? <>Only <b className="num">{p.stock} {unit}</b> in stock — the sale will still go through.</>
+                        : <>In stock: <b className="num font-semibold text-slate-700">{p.stock} {unit}</b> · Rate per {unit}</>}
                     </p>
                   )}
                   {err && <p className="field-error">{err}</p>}
@@ -217,6 +250,34 @@ export default function PosScreen({ isAdmin }) {
               );
             })}
           </div>
+
+          {/* অপশনাল এক্সট্রা খরচ (গাড়ি ভাড়া / লেবার খরচ) */}
+          <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4">
+            <div className="mb-2.5 flex items-center gap-2 text-xs font-semibold text-navy-900">
+              <Coins className="h-4 w-4 text-gold-600" aria-hidden />
+              <span>Extra Cost / Transport / Labor Charge (Optional)</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+              <Input
+                label="Cost Details (e.g. Car rent, Labor, Unloading)"
+                placeholder="গাড়ি ভাড়া / লেবার খরচ..."
+                value={extraCostLabel}
+                onChange={(e) => setExtraCostLabel(e.target.value)}
+              />
+              <Input
+                label="Extra Cost Amount (৳)"
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={extraCost}
+                onChange={(e) => setExtraCost(e.target.value)}
+                error={errors.extraCost}
+              />
+            </div>
+          </div>
+
           {errors.general && <p className="field-error border-t border-slate-100 px-5 py-3">{errors.general}</p>}
         </section>
       </div>
@@ -228,6 +289,12 @@ export default function PosScreen({ isAdmin }) {
           <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-medium text-slate-300">{isAdmin ? "Instant" : "Needs approval"}</span>
         </div>
         <div className="divide-y divide-white/10">
+          {extraCostP > 0 && (
+            <>
+              <Row label="Items Subtotal" value={formatMoney(itemsSubtotal)} />
+              <Row label={extraCostLabel.trim() ? `Extra (${extraCostLabel.trim()})` : "Extra Cost"} value={formatMoney(extraCostP)} tone="text-amber-300" />
+            </>
+          )}
           <Row label="Total Sale" value={formatMoney(total)} strong />
           <div className="py-3">
             <label htmlFor="paid" className="mb-1.5 block text-sm text-slate-400">Paid Amount</label>

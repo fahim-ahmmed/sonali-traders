@@ -11,16 +11,31 @@ export async function GET(req) {
   const sp = new URL(req.url).searchParams;
   const q = (sp.get("q") || "").trim();
   const category = (sp.get("category") || "").toLowerCase();
+  const sub = (sp.get("sub") || "").trim();
   const due = sp.get("due") === "1";
   const sort = sp.get("sort") === "due" || due ? { balance: -1, name: 1 } : { name: 1 };
   const page = Math.max(1, Number(sp.get("page")) || 1);
   const limit = Math.min(100, Math.max(1, Number(sp.get("limit")) || 25));
 
   await connectDB();
-  const filter = { active: true };
-  if (q) { const r = new RegExp(esc(q), "i"); filter.$or = [{ name: r }, { phone: r }, { address: r }]; }
-  if (["cement", "rod"].includes(category)) filter.tags = category;
-  if (due) filter.balance = { $gt: 0 };
+  const andConditions = [{ active: true }];
+
+  if (q) {
+    const r = new RegExp(esc(q), "i");
+    andConditions.push({ $or: [{ name: r }, { phone: r }, { address: r }] });
+  }
+  if (["cement", "rod"].includes(category)) {
+    andConditions.push({ tags: category });
+  }
+  if (sub) {
+    const subRegex = new RegExp(esc(sub), "i");
+    andConditions.push({ $or: [{ name: subRegex }, { tags: subRegex }] });
+  }
+  if (due) {
+    andConditions.push({ balance: { $gt: 0 } });
+  }
+
+  const filter = andConditions.length === 1 ? andConditions[0] : { $and: andConditions };
 
   const [items, total] = await Promise.all([
     Customer.find(filter).sort(sort).skip((page - 1) * limit).limit(limit).lean(),

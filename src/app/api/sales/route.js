@@ -2,12 +2,11 @@ import { ok, fail, requireUser } from "@/lib/api";
 import { saleSchema } from "@/lib/sale-schema";
 import { approveSale } from "@/lib/sales";
 import { withTx, handleError, AppError, dateFromKey } from "@/lib/tx";
-import { connectDB } from "@/lib/db";
 import Customer from "@/models/Customer";
 import Product from "@/models/Product";
+import Category from "@/models/Category";
 import Sale from "@/models/Sale";
 
-// POS জমা: Admin → সরাসরি approved; Staff → pending (Approvals-এ যায়)
 export async function POST(req) {
   const { user, error } = await requireUser("pos");
   if (error) return error;
@@ -15,42 +14,74 @@ export async function POST(req) {
   if (!parsed.success) return fail(parsed.error.issues[0].message, 422);
   const d = parsed.data;
 
-  await connectDB();
-  // একই clientRef আবার এলে (ডাবল ক্লিক/রিট্রাই) আগেরটাই ফেরত — ডুপ্লিকেট হয় না
-  const existing = await Sale.findOne({ clientRef: d.clientRef }).lean();
-  if (existing) return ok({ id: String(existing._id), status: existing.status, invoiceNo: existing.invoiceNo || null, customerId: String(existing.customerId), duplicate: true });
-
   try {
-    const sale = await withTx(async (session) => {
-      const customer = await Customer.findById(d.customerId).session(session);
-      if (!customer || !customer.active) throw new AppError("Customer not found", 422);
+    const out = await withTx(async (session) => {
+      const existing = await Sale.findOne({ clientRef: d.clientRef }).session(session);
+      if (existing) return existing;
 
-      const ids = [...new Set(d.items.map((i) => i.productId))];
-      const products = await Product.find({ _id: { $in: ids }, active: true }).populate("categoryId", "category brand").session(session);
-      const pmap = new Map(products.map((p) => [String(p._id), p]));
-      const items = d.items.map((i) => {
-        const p = pmap.get(i.productId);
-        if (!p) throw new AppError("A selected product no longer exists", 422);
+      const customer = await Customer.findOne({ _id: d.customerId, active: true }).session(session);
+      if (!customer) throw new AppError("Customer not found", 404);
+
+      const pIds = [...new Set(d.items.map((i) => i.productId))];
+      const products = pIds.length ? await Product.find({ _id: { $in: pIds }, active: true }).session(session) : [];
+      if (products.length !== pIds.length) throw new AppError("One or more products were not found", 404);
+      const pMap = new Map(products.map((p) => [String(p._id), p]));
+
+      const cIds = [...new Set(products.map((p) => String(p.categoryId)).filter(Boolean))];
+      const categories = cIds.length ? await Category.find({ _id: { $in: cIds } }).session(session) : [];
+      const cMap = new Map(categories.map((c) => [String(c._id), c]));
+
+      const items = d.items.map((it) => {
+        const p = pMap.get(it.productId);
+        const cat = cMap.get(String(p.categoryId));
+        const lineTotal = Math.round(it.qty * it.rate);
         return {
           productId: p._id,
           name: p.name,
-          category: p.categoryId?.category || "",
-          brand: p.categoryId?.brand || p.brand,
-          qty: i.qty,
-          rate: i.rate,
-          lineTotal: Math.round(i.qty * i.rate),
+          category: cat?.category || "",
+          brand: p.brand,
+          qty: it.qty,
+          rate: it.rate,
+          lineTotal,
         };
       });
-      const total = items.reduce((s, i) => s + i.lineTotal, 0); // সার্ভারে পুনরায় হিসাব
 
-      const [doc] = await Sale.create([{
-        clientRef: d.clientRef, customerId: customer._id, date: dateFromKey(d.date), items, total, paid: d.paid,
-        status: "pending", submittedBy: user.id, submittedByName: user.name, remarks: d.remarks, trackNumber: d.trackNumber,
-      }], { session });
+      const itemsSubtotal = items.reduce((s, i) => s + i.lineTotal, 0);
+      const extraCost = d.extraCost || 0;
+      const total = itemsSubtotal + extraCost;
 
-      if (user.role === "admin") await approveSale(doc, user.id, session);
-      return doc;
+      const [sale] = await Sale.create(
+        [{
+          clientRef: d.clientRef,
+          customerId: customer._id,
+          date: dateFromKey(d.date),
+          items,
+          extraCostLabel: extraCost > 0 ? (d.extraCostLabel || "Extra cost") : "",
+          extraCost,
+          total,
+          paid: d.paid,
+          remarks: d.remarks,
+          trackNumber: d.trackNumber,
+          status: "pending",
+          submittedBy: user.id,
+          submittedByName: user.name,
+        }],
+        { session }
+      );
+
+      if (user.role === "admin") {
+        await approveSale(sale, user.id, session);
+      }
+      return sale;
     });
-    return ok({ id: String(sale._id), status: sale.status, invoiceNo: sale.invoiceNo || null, customerId: String(sale.customerId) }, 201);
-  } catch (e) { return handleError(e); }
+
+    return ok({
+      id: String(out._id),
+      status: out.status,
+      invoiceNo: out.invoiceNo || null,
+      customerId: String(out.customerId),
+    }, 201);
+  } catch (e) {
+    return handleError(e);
+  }
 }
