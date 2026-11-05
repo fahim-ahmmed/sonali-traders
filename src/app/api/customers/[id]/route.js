@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { connectDB } from "@/lib/db";
 import { ok, fail, requireAny } from "@/lib/api";
 import { isValidId } from "@/lib/ids";
@@ -5,6 +6,11 @@ import { customerSchema } from "@/lib/customer-schema";
 import { customerDto } from "@/lib/ledger";
 import Customer from "@/models/Customer";
 import LedgerEntry from "@/models/LedgerEntry";
+
+const metricsSchema = z.object({
+  manualAvgSale: z.number().int().min(0).nullable().optional(),
+  manualLastMonthCollection: z.number().int().min(0).nullable().optional(),
+});
 
 export async function GET(_req, { params }) {
   const { error } = await requireAny(["customer_list"]);
@@ -49,6 +55,29 @@ export async function PUT(req, { params }) {
   return ok(customerDto(c));
 }
 
+// ওয়েবসাইট থেকে Average Sale ও Last Month Collection সরাসরি সেট/আপডেট করার রুট
+export async function PATCH(req, { params }) {
+  const { error } = await requireAny(["customer_list"]);
+  if (error) return error;
+  const { id } = await params;
+  if (!isValidId(id)) return fail("Invalid id", 400);
+  const parsed = metricsSchema.safeParse(await req.json());
+  if (!parsed.success) return fail(parsed.error.issues[0].message, 422);
+
+  await connectDB();
+  const update = {};
+  if ("manualAvgSale" in parsed.data) update.manualAvgSale = parsed.data.manualAvgSale;
+  if ("manualLastMonthCollection" in parsed.data) update.manualLastMonthCollection = parsed.data.manualLastMonthCollection;
+
+  const c = await Customer.findByIdAndUpdate(id, { $set: update }, { new: true });
+  if (!c) return fail("Customer not found", 404);
+  return ok({
+    id: String(c._id),
+    manualAvgSale: c.manualAvgSale,
+    manualLastMonthCollection: c.manualLastMonthCollection,
+  });
+}
+
 export async function DELETE(_req, { params }) {
   const { error } = await requireAny(["customer_list"]);
   if (error) return error;
@@ -59,7 +88,7 @@ export async function DELETE(_req, { params }) {
   if (!c) return fail("Customer not found", 404);
   if (c.balance !== 0) return fail("This customer still has a due or advance balance. Settle it before deleting.", 409);
   if (await LedgerEntry.exists({ partyId: id })) {
-    c.active = false; await c.save(); // লেনদেন আছে → archive
+    c.active = false; await c.save();
     return ok({ archived: true });
   }
   await c.deleteOne();

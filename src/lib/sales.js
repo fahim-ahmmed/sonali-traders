@@ -42,8 +42,12 @@ export async function approveSale(sale, approverId, session) {
       sale.items.map((it) => ({ productId: it.productId, date: sale.date, type: "sale", qty: -it.qty, refId: sale._id, note: sale.invoiceNo })),
       { session }
     );
-    const cats = [...new Set(sale.items.map((i) => i.category?.toLowerCase()).filter(Boolean))];
-    if (cats.length) await Customer.updateOne({ _id: sale.customerId }, { $addToSet: { tags: {$each: cats } } }, { session });
+    const catTags = sale.items.map((i) => i.category?.toLowerCase()?.trim()).filter(Boolean);
+    const brandTags = sale.items.map((i) => i.brand?.toLowerCase()?.trim()).filter(Boolean);
+    const allTags = [...new Set([...catTags, ...brandTags])];
+    if (allTags.length) {
+      await Customer.updateOne({ _id: sale.customerId }, { $addToSet: { tags: { $each: allTags } } }, { session });
+    }
   }
 
   // লেজার: sale → debit=total, credit=paid; পণ্যহীন = কালেকশন (credit)

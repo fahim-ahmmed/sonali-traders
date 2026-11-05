@@ -5,7 +5,7 @@ import Category from "../src/models/Category.js";
 import Product from "../src/models/Product.js";
 import { CATEGORY_BRANDS, PRODUCTS } from "./product-catalog-data.js";
 
-const expectedSellingTotal = 304601;
+const expectedSellingTotal = PRODUCTS.reduce((sum, [, , , price]) => sum + price, 0);
 
 try {
   await connectDB();
