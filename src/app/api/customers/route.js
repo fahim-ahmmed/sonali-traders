@@ -1,7 +1,7 @@
 import { connectDB } from "@/lib/db";
 import { ok, fail, requireAny } from "@/lib/api";
 import { esc } from "@/lib/regex";
-import { customerSchema } from "@/lib/customer-schema";
+import { customerSchema, normalizeCustomerCategory, customerCategoryInfo } from "@/lib/customer-schema";
 import { customerDto } from "@/lib/ledger";
 import Customer from "@/models/Customer";
 import LedgerEntry from "@/models/LedgerEntry";
@@ -49,7 +49,13 @@ export async function GET(req) {
   }
   if (sub) {
     const subRegex = new RegExp(esc(sub), "i");
-    andConditions.push({ $or: [{ name: subRegex }, { tags: subRegex }] });
+    // সাব-ক্যাটাগরি সেট থাকলে সেটি দিয়ে মিলবে; সেট না থাকলে আগের মতো নাম/ট্যাগ দিয়ে
+    andConditions.push({
+      $or: [
+        { subCategory: subRegex },
+        { subCategory: { $in: ["", null] }, $or: [{ name: subRegex }, { tags: subRegex }] },
+      ],
+    });
   }
   if (due) {
     andConditions.push({ balance: { $gt: 0 } });
@@ -119,6 +125,7 @@ export async function GET(req) {
 
     return {
       ...dto,
+      ...customerCategoryInfo(c),
       avgSale: c.manualAvgSale !== null && c.manualAvgSale !== undefined ? c.manualAvgSale : computedAvgSale,
       lastMonthCollection:
         c.manualLastMonthCollection !== null && c.manualLastMonthCollection !== undefined
@@ -146,6 +153,6 @@ export async function POST(req) {
   if (!parsed.success) return fail(parsed.error.issues[0].message, 422);
   await connectDB();
   const dup = parsed.data.phone ? await Customer.exists({ phone: parsed.data.phone, active: true }) : null;
-  const c = await Customer.create(parsed.data);
-  return ok({ ...customerDto(c), warning: dup ? "Another customer already uses this phone number" : null }, 201);
+  const c = await Customer.create(normalizeCustomerCategory(parsed.data));
+  return ok({ ...customerDto(c), ...customerCategoryInfo(c), warning: dup ? "Another customer already uses this phone number" : null }, 201);
 }

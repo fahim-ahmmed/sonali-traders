@@ -2,7 +2,7 @@ import { z } from "zod";
 import { connectDB } from "@/lib/db";
 import { ok, fail, requireAny } from "@/lib/api";
 import { isValidId } from "@/lib/ids";
-import { customerSchema } from "@/lib/customer-schema";
+import { customerSchema, normalizeCustomerCategory, customerCategoryInfo } from "@/lib/customer-schema";
 import { customerDto } from "@/lib/ledger";
 import Customer from "@/models/Customer";
 import LedgerEntry from "@/models/LedgerEntry";
@@ -34,7 +34,7 @@ export async function GET(_req, { params }) {
       total: entry.debit, received: entry.credit, balance, note: entry.note,
     };
   });
-  const customer = customerDto({ ...c, balance });
+  const customer = { ...customerDto({ ...c, balance }), ...customerCategoryInfo(c) };
   return ok({
     customer,
     summary: { totalPurchases, totalPayments, due: Math.max(balance, 0), advance: Math.max(-balance, 0) },
@@ -47,12 +47,20 @@ export async function PUT(req, { params }) {
   if (error) return error;
   const { id } = await params;
   if (!isValidId(id)) return fail("Invalid id", 400);
-  const parsed = customerSchema.safeParse(await req.json());
+  const body = await req.json();
+  const parsed = customerSchema.safeParse(body);
   if (!parsed.success) return fail(parsed.error.issues[0].message, 422);
   await connectDB();
-  const c = await Customer.findByIdAndUpdate(id, parsed.data, { new: true });
+  const data = normalizeCustomerCategory(parsed.data);
+  // রিকোয়েস্টে category না এলে (পুরনো ক্লায়েন্ট) আগের ক্যাটাগরি অপরিবর্তিত থাকবে
+  if (!body || !("category" in body)) {
+    delete data.category;
+    delete data.subCategory;
+    delete data.tags;
+  }
+  const c = await Customer.findByIdAndUpdate(id, data, { new: true });
   if (!c) return fail("Customer not found", 404);
-  return ok(customerDto(c));
+  return ok({ ...customerDto(c), ...customerCategoryInfo(c) });
 }
 
 // ওয়েবসাইট থেকে Average Sale ও Last Month Collection সরাসরি সেট/আপডেট করার রুট
