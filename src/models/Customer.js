@@ -9,7 +9,8 @@ const CustomerSchema = new mongoose.Schema(
     category: { type: String, enum: ["", "cement", "rod", "general"], default: "" }, // কাস্টমারের ক্যাটাগরি
     subCategory: { type: String, default: "", trim: true }, // ব্র্যান্ড/সাব-ক্যাটাগরি, যেমন "DHALAI SPECIAL"
     balance: { type: Number, default: 0 }, // পয়সা: + = Due, - = Advance
-    manualAvgSale: { type: Number, default: null }, // পয়সা (ঐচ্ছিক ম্যানুয়াল ওভাররাইড)
+    manualAvgSale: { type: Number, default: null }, // (পুরনো, এখন ব্যবহার হয় না — টাকায় ছিল)
+    manualAvgQty: { type: Number, default: null }, // গড় সেল পরিমাণ (সিমেন্টে বস্তা, রডে কেজি) — ঐচ্ছিক ম্যানুয়াল ওভাররাইড
     manualLastMonthCollection: { type: Number, default: null }, // পয়সা (ঐচ্ছিক ম্যানুয়াল এন্ট্রি)
     active: { type: Boolean, default: true },
   },

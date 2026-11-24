@@ -72,7 +72,7 @@ export async function GET(req) {
     Customer.countDocuments(filter),
   ]);
 
-  // কাস্টমারদের Average Sale এবং Last Month Collection হিসাব করা
+  // কাস্টমারদের Average Sale (পরিমাণ) এবং Last Month Collection হিসাব করা
   const customerIds = items.map((c) => c._id);
   const { start: prevStart, end: prevEnd } = getPreviousMonthRange();
 
@@ -84,14 +84,14 @@ export async function GET(req) {
               partyType: "customer",
               partyId: { $in: customerIds },
               type: "sale",
-              debit: { $gt: 0 },
+              qty: { $gt: 0 },
             },
           },
           {
             $group: {
               _id: "$partyId",
-              avgSale: { $avg: "$debit" },
-              totalSale: { $sum: "$debit" },
+              avgQty: { $avg: "$qty" },
+              totalQty: { $sum: "$qty" },
               saleCount: { $sum: 1 },
             },
           },
@@ -115,25 +115,28 @@ export async function GET(req) {
       ])
     : [[], []];
 
-  const saleMap = new Map(saleStats.map((s) => [String(s._id), Math.round(s.avgSale || 0)]));
+  const saleMap = new Map(saleStats.map((s) => [String(s._id), Math.round((s.avgQty || 0) * 100) / 100]));
   const colMap = new Map(collectionStats.map((c) => [String(c._id), Math.round(c.lastMonthCollection || 0)]));
 
   const enrichedItems = items.map((c) => {
     const dto = customerDto(c);
-    const computedAvgSale = saleMap.get(dto.id) || 0;
+    const computedAvgQty = saleMap.get(dto.id) || 0;
     const computedLastMonthCol = colMap.get(dto.id) || 0;
+    const catInfo = customerCategoryInfo(c);
+    const unit = catInfo.category === "rod" ? "KG" : "Bag"; // রড = কেজি, সিমেন্ট = বস্তা
 
     return {
       ...dto,
-      ...customerCategoryInfo(c),
-      avgSale: c.manualAvgSale !== null && c.manualAvgSale !== undefined ? c.manualAvgSale : computedAvgSale,
+      ...catInfo,
+      unit,
+      avgQty: c.manualAvgQty !== null && c.manualAvgQty !== undefined ? c.manualAvgQty : computedAvgQty,
       lastMonthCollection:
         c.manualLastMonthCollection !== null && c.manualLastMonthCollection !== undefined
           ? c.manualLastMonthCollection
           : computedLastMonthCol,
-      computedAvgSale,
+      computedAvgQty,
       computedLastMonthCol,
-      hasManualAvgSale: c.manualAvgSale !== null && c.manualAvgSale !== undefined,
+      hasManualAvgQty: c.manualAvgQty !== null && c.manualAvgQty !== undefined,
       hasManualLastMonthCol: c.manualLastMonthCollection !== null && c.manualLastMonthCollection !== undefined,
     };
   });

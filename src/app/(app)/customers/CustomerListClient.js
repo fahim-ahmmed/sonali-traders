@@ -41,6 +41,9 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+// পরিমাণ দেখানো (বস্তা/কেজি) — দশমিক থাকলে সর্বোচ্চ ২ ঘর
+const fmtQty = (n) => Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+
 export default function CustomerListClient() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -59,7 +62,7 @@ export default function CustomerListClient() {
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // Average Sale ও Last Month Collection ম্যানুয়ালি অ্যাড/এডিট করার স্টেট
+  // Average Sale (পরিমাণ) ও Last Month Collection ম্যানুয়ালি অ্যাড/এডিট করার স্টেট
   const [editingMetrics, setEditingMetrics] = useState(null);
   const [metricsSaving, setMetricsSaving] = useState(false);
 
@@ -160,9 +163,10 @@ export default function CustomerListClient() {
     setEditingMetrics({
       id: c.id,
       name: c.name,
-      avgSale: c.avgSale > 0 ? String(toTaka(c.avgSale)) : "",
+      unit: c.unit || "Bag",
+      avgQty: c.hasManualAvgQty ? String(c.avgQty) : "",
       lastMonthCollection: c.lastMonthCollection > 0 ? String(toTaka(c.lastMonthCollection)) : "",
-      computedAvgSale: c.computedAvgSale || 0,
+      computedAvgQty: c.computedAvgQty || 0,
       computedLastMonthCol: c.computedLastMonthCol || 0,
     });
   }
@@ -170,9 +174,12 @@ export default function CustomerListClient() {
   async function saveMetrics(e) {
     e.preventDefault();
     if (metricsSaving || !editingMetrics) return;
+    if (editingMetrics.avgQty !== "" && !(Number(editingMetrics.avgQty) >= 0)) {
+      return toast("Average sale quantity must be 0 or more", "error");
+    }
     setMetricsSaving(true);
     const payload = {
-      manualAvgSale: editingMetrics.avgSale === "" ? null : toPaisa(editingMetrics.avgSale),
+      manualAvgQty: editingMetrics.avgQty === "" ? null : Number(editingMetrics.avgQty),
       manualLastMonthCollection: editingMetrics.lastMonthCollection === "" ? null : toPaisa(editingMetrics.lastMonthCollection),
     };
     const res = await fetch(`/api/customers/${editingMetrics.id}`, {
@@ -226,7 +233,6 @@ export default function CustomerListClient() {
 
       const totalDue = rows.reduce((s, r) => s + (r.due || 0), 0);
       const totalAdv = rows.reduce((s, r) => s + (r.advance || 0), 0);
-      const totalAvgSale = rows.reduce((s, r) => s + (r.avgSale || 0), 0);
       const totalLastCol = rows.reduce((s, r) => s + (r.lastMonthCollection || 0), 0);
 
       const tableRowsHtml = rows
@@ -236,8 +242,8 @@ export default function CustomerListClient() {
           const dueColor = c.due > 0 ? "#BE123C" : "#94A3B8";
           const advBg = c.advance > 0 ? "#ECFDF5" : rowBg;
           const advColor = c.advance > 0 ? "#047857" : "#94A3B8";
-          const avgBg = c.avgSale > 0 ? "#EFF6FF" : rowBg;
-          const avgColor = c.avgSale > 0 ? "#1D4ED8" : "#94A3B8";
+          const avgBg = c.avgQty > 0 ? "#EFF6FF" : rowBg;
+          const avgColor = c.avgQty > 0 ? "#1D4ED8" : "#94A3B8";
           const colBg = c.lastMonthCollection > 0 ? "#FEF3C7" : rowBg;
           const colColor = c.lastMonthCollection > 0 ? "#B45309" : "#94A3B8";
 
@@ -249,7 +255,7 @@ export default function CustomerListClient() {
               <td style="background:${rowBg};border:1px solid #CBD5E1;padding:8px;color:#334155;">${escapeHtml(c.address || "—")}</td>
               <td style="background:${dueBg};border:1px solid #CBD5E1;padding:8px;text-align:right;font-weight:bold;color:${dueColor};">${formatMoney(c.due || 0)}</td>
               <td style="background:${advBg};border:1px solid #CBD5E1;padding:8px;text-align:right;font-weight:bold;color:${advColor};">${formatMoney(c.advance || 0)}</td>
-              <td style="background:${avgBg};border:1px solid #CBD5E1;padding:8px;text-align:right;font-weight:bold;color:${avgColor};">${formatMoney(c.avgSale || 0)}</td>
+              <td style="background:${avgBg};border:1px solid #CBD5E1;padding:8px;text-align:right;font-weight:bold;color:${avgColor};">${fmtQty(c.avgQty || 0)} ${escapeHtml(c.unit || "Bag")}</td>
               <td style="background:${colBg};border:1px solid #CBD5E1;padding:8px;text-align:right;font-weight:bold;color:${colColor};">${formatMoney(c.lastMonthCollection || 0)}</td>
             </tr>
           `;
@@ -292,7 +298,7 @@ export default function CustomerListClient() {
               <th style="background:#1769AA;color:#FFFFFF;border:1px solid #0B2239;padding:10px;width:220px;text-align:left;">Address</th>
               <th style="background:#BE123C;color:#FFFFFF;border:1px solid #0B2239;padding:10px;width:150px;text-align:right;">Due Amount</th>
               <th style="background:#047857;color:#FFFFFF;border:1px solid #0B2239;padding:10px;width:150px;text-align:right;">Advance Payment</th>
-              <th style="background:#1D4ED8;color:#FFFFFF;border:1px solid #0B2239;padding:10px;width:150px;text-align:right;">Average Sale</th>
+              <th style="background:#1D4ED8;color:#FFFFFF;border:1px solid #0B2239;padding:10px;width:150px;text-align:right;">Average Sale (Qty)</th>
               <th style="background:#D97706;color:#FFFFFF;border:1px solid #0B2239;padding:10px;width:170px;text-align:right;">Last Month Collection</th>
             </tr>
             ${tableRowsHtml}
@@ -300,7 +306,7 @@ export default function CustomerListClient() {
               <td colspan="4" style="background:#0B2239;color:#FFFFFF;border:1px solid #0B2239;padding:10px;text-align:right;font-weight:bold;">TOTAL (${rows.length} Customers)</td>
               <td style="background:#FFE4E6;color:#BE123C;border:1px solid #0B2239;padding:10px;text-align:right;font-weight:bold;">${formatMoney(totalDue)}</td>
               <td style="background:#D1FAE5;color:#047857;border:1px solid #0B2239;padding:10px;text-align:right;font-weight:bold;">${formatMoney(totalAdv)}</td>
-              <td style="background:#DBEAFE;color:#1D4ED8;border:1px solid #0B2239;padding:10px;text-align:right;font-weight:bold;">${formatMoney(totalAvgSale)}</td>
+              <td style="background:#DBEAFE;color:#1D4ED8;border:1px solid #0B2239;padding:10px;text-align:right;font-weight:bold;">—</td>
               <td style="background:#FEF3C7;color:#B45309;border:1px solid #0B2239;padding:10px;text-align:right;font-weight:bold;">${formatMoney(totalLastCol)}</td>
             </tr>
           </table>
@@ -528,7 +534,7 @@ export default function CustomerListClient() {
                     <th className="th">Address</th>
                     <th className="th text-right">Due Amount</th>
                     <th className="th text-right">Advance Payment</th>
-                    <th className="th text-right">Average Sale</th>
+                    <th className="th text-right">Average Sale (Qty)</th>
                     <th className="th text-right">Last Month Collection</th>
                     <th className="th text-right">Actions</th>
                   </tr>
@@ -565,10 +571,10 @@ export default function CustomerListClient() {
                       </td>
                       <td className="td text-right">
                         <div className="inline-flex items-center justify-end gap-1.5">
-                          {c.avgSale > 0 ? (
-                            <span className="badge badge-info num">{formatMoney(c.avgSale)}</span>
+                          {c.avgQty > 0 ? (
+                            <span className="badge badge-info num">{fmtQty(c.avgQty)} {c.unit}</span>
                           ) : (
-                            <span className="num text-slate-400">{formatMoney(0)}</span>
+                            <span className="num text-slate-400">0 {c.unit}</span>
                           )}
                           <button
                             type="button"
@@ -622,7 +628,7 @@ export default function CustomerListClient() {
         </section>
       </main>
 
-      {/* Average Sale & Last Month Collection Edit Modal */}
+      {/* Average Sale (Qty) & Last Month Collection Edit Modal */}
       <Modal
         open={!!editingMetrics}
         onClose={() => !metricsSaving && setEditingMetrics(null)}
@@ -632,17 +638,17 @@ export default function CustomerListClient() {
           <form onSubmit={saveMetrics} className="space-y-4">
             <div>
               <Input
-                label="Average Sale (৳)"
+                label={`Average Sale (${editingMetrics.unit})`}
                 type="number"
                 min="0"
                 step="0.01"
                 inputMode="decimal"
                 placeholder="Leave blank for auto-calculation"
-                value={editingMetrics.avgSale}
-                onChange={(e) => setEditingMetrics({ ...editingMetrics, avgSale: e.target.value })}
+                value={editingMetrics.avgQty}
+                onChange={(e) => setEditingMetrics({ ...editingMetrics, avgQty: e.target.value })}
               />
               <p className="mt-1 text-[11px] text-slate-500">
-                Auto-calculated from ledger: <b className="num">{formatMoney(editingMetrics.computedAvgSale)}</b> (Clear field to use auto value)
+                Auto-calculated from sales: <b className="num">{fmtQty(editingMetrics.computedAvgQty)} {editingMetrics.unit}</b> per sale (Clear field to use auto value)
               </p>
             </div>
             <div>

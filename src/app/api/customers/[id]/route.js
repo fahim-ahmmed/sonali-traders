@@ -8,7 +8,7 @@ import Customer from "@/models/Customer";
 import LedgerEntry from "@/models/LedgerEntry";
 
 const metricsSchema = z.object({
-  manualAvgSale: z.number().int().min(0).nullable().optional(),
+  manualAvgQty: z.number().min(0).max(1000000000).nullable().optional(), // গড় সেল পরিমাণ (বস্তা/কেজি)
   manualLastMonthCollection: z.number().int().min(0).nullable().optional(),
 });
 
@@ -63,7 +63,7 @@ export async function PUT(req, { params }) {
   return ok({ ...customerDto(c), ...customerCategoryInfo(c) });
 }
 
-// ওয়েবসাইট থেকে Average Sale ও Last Month Collection সরাসরি সেট/আপডেট করার রুট
+// ওয়েবসাইট থেকে Average Sale (পরিমাণ) ও Last Month Collection সরাসরি সেট/আপডেট করার রুট
 export async function PATCH(req, { params }) {
   const { error } = await requireAny(["customer_list"]);
   if (error) return error;
@@ -74,14 +74,14 @@ export async function PATCH(req, { params }) {
 
   await connectDB();
   const update = {};
-  if ("manualAvgSale" in parsed.data) update.manualAvgSale = parsed.data.manualAvgSale;
+  if ("manualAvgQty" in parsed.data) update.manualAvgQty = parsed.data.manualAvgQty;
   if ("manualLastMonthCollection" in parsed.data) update.manualLastMonthCollection = parsed.data.manualLastMonthCollection;
 
   const c = await Customer.findByIdAndUpdate(id, { $set: update }, { new: true });
   if (!c) return fail("Customer not found", 404);
   return ok({
     id: String(c._id),
-    manualAvgSale: c.manualAvgSale,
+    manualAvgQty: c.manualAvgQty,
     manualLastMonthCollection: c.manualLastMonthCollection,
   });
 }
