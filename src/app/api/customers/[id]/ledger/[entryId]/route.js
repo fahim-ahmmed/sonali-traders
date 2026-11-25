@@ -6,9 +6,11 @@ import { ok, fail, requireAny } from "@/lib/api";
 import { isValidId } from "@/lib/ids";
 import { isValidDateKey } from "@/lib/dates";
 import { withTx, dateFromKey } from "@/lib/tx-core";
-import Customer from "@/models/Customer";
+import { recalculateCustomerLedger } from "@/lib/ledger";
 import LedgerEntry from "@/models/LedgerEntry";
 import Sale from "@/models/Sale";
+import Product from "@/models/Product";
+import StockMovement from "@/models/StockMovement";
 
 class UserError extends Error {}
 
@@ -20,7 +22,7 @@ const editSchema = z.object({
   note: z.string().trim().max(200).optional().default(""),
 });
 
-const EDITABLE = ["payment", "advance", "opening_due"];
+const EDITABLE = ["sale", "payment", "advance", "opening_due"];
 
 async function adminOnly() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -28,36 +30,16 @@ async function adminOnly() {
   return null;
 }
 
+// এন্ট্রি ও (থাকলে) তার সাথে যুক্ত Sale ইনভয়েস লোড করা
 async function loadEntry(session, customerId, entryId) {
   const entry = await LedgerEntry.findOne({ _id: entryId, partyType: "customer", partyId: customerId }).session(session);
   if (!entry) throw new UserError("Ledger entry not found");
-  if (entry.type === "sale") {
-    throw new UserError("Sale entries are linked to an invoice and stock, so they can't be edited or deleted from here.");
-  }
   if (!EDITABLE.includes(entry.type)) throw new UserError("This kind of ledger entry can't be changed.");
-  return entry;
-}
-
-// পুরো লেজার আবার ক্রমানুসারে হিসাব করে প্রতিটি balanceAfter ও কাস্টমারের মোট ব্যালেন্স ঠিক করা
-async function recompute(session, customerId) {
-  const entries = await LedgerEntry.find({ partyType: "customer", partyId: customerId })
-    .sort({ date: 1, createdAt: 1, _id: 1 }).session(session).lean();
-  let balance = 0;
-  const entryWrites = [];
-  const saleWrites = [];
-  for (const entry of entries) {
-    balance += (entry.debit || 0) - (entry.credit || 0);
-    if (entry.balanceAfter !== balance) {
-      entryWrites.push({ updateOne: { filter: { _id: entry._id }, update: { $set: { balanceAfter: balance } } } });
-    }
-    if (entry.type === "sale" && entry.refId) {
-      saleWrites.push({ updateOne: { filter: { _id: entry.refId }, update: { $set: { dueAfter: balance } } } });
-    }
+  let sale = null;
+  if (entry.refId && ["sale", "payment", "advance"].includes(entry.type)) {
+    sale = await Sale.findOne({ _id: entry.refId, customerId }).session(session);
   }
-  if (entryWrites.length) await LedgerEntry.bulkWrite(entryWrites, { session, ordered: true });
-  if (saleWrites.length) await Sale.bulkWrite(saleWrites, { session, ordered: true });
-  await Customer.updateOne({ _id: customerId }, { $set: { balance } }, { session });
-  return balance;
+  return { entry, sale };
 }
 
 export async function PUT(req, { params }) {
@@ -75,22 +57,38 @@ export async function PUT(req, { params }) {
   let balance = 0;
   try {
     await withTx(async (session) => {
-      const entry = await loadEntry(session, id, entryId);
+      const { entry, sale } = await loadEntry(session, id, entryId);
+      const newDate = dateFromKey(date);
+
       if (entry.type === "opening_due") {
         if (!(debit > 0)) throw new UserError("Enter a due amount more than 0");
         entry.debit = debit;
         entry.credit = 0;
+      } else if (entry.type === "sale") {
+        // বিক্রির মোট (debit) ইনভয়েস আইটেমের সাথে জড়ানো, তাই অপরিবর্তিত থাকে; শুধু Paid বদলায়
+        entry.credit = credit;
       } else {
         // payment / advance
         if (!(credit > 0)) throw new UserError("Enter an amount more than 0");
         entry.debit = 0;
         entry.credit = credit;
       }
-      entry.date = dateFromKey(date);
+
+      entry.date = newDate;
       if (description) entry.description = description;
       entry.note = note;
       await entry.save({ session });
-      balance = await recompute(session, id);
+
+      // যুক্ত ইনভয়েস থাকলে সেটাও মিলিয়ে দেওয়া
+      if (sale) {
+        sale.date = newDate;
+        sale.paid = entry.credit;
+        sale.remarks = note;
+        await sale.save({ session });
+        await StockMovement.updateMany({ refId: sale._id, type: "sale" }, { $set: { date: newDate } }, { session });
+      }
+
+      balance = await recalculateCustomerLedger(id, session);
     });
   } catch (e) {
     if (e instanceof UserError) return fail(e.message, 422);
@@ -111,9 +109,19 @@ export async function DELETE(_req, { params }) {
   let balance = 0;
   try {
     await withTx(async (session) => {
-      const entry = await loadEntry(session, id, entryId);
-      await entry.deleteOne({ session });
-      balance = await recompute(session, id);
+      const { entry, sale } = await loadEntry(session, id, entryId);
+
+      if (sale) {
+        // বিক্রি মুছলে প্রতিটি আইটেমের স্টক ফেরত যাবে
+        for (const it of sale.items || []) {
+          await Product.updateOne({ _id: it.productId }, { $inc: { stock: it.qty } }, { session });
+        }
+        await StockMovement.deleteMany({ refId: sale._id, type: "sale" }, { session });
+        await Sale.deleteOne({ _id: sale._id }, { session });
+      }
+
+      await LedgerEntry.deleteOne({ _id: entry._id }, { session });
+      balance = await recalculateCustomerLedger(id, session);
     });
   } catch (e) {
     if (e instanceof UserError) return fail(e.message, 422);
